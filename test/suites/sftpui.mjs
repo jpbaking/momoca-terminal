@@ -207,9 +207,20 @@ const row = await ev(`(() => {
   return JSON.stringify({ x, y, reachable: hit === top || hit.contains(top) });
 })()`)
 rec('the saved session row is reachable', Boolean(row) && JSON.parse(row).reachable)
+const tabCount = async () => Number(await ev(`document.querySelectorAll('.tab').length`))
+const tabsBefore = await tabCount()
 if (row) {
-  // A session row opens on a double-click; two real clicks at the same point.
   const { x, y } = JSON.parse(row)
+  // A lone click must not connect: that is what double-click exists to prevent.
+  await clickAt(x, y)
+  await sleep(1200)
+  const modalAfterClick = await ev(`!!document.querySelector('.modal')`)
+  rec(
+    'a single click on a session row opens nothing',
+    (await tabCount()) === tabsBefore && !modalAfterClick,
+    `${(await tabCount()) - tabsBefore} new tab(s)${modalAfterClick ? ', a dialog opened' : ''}`
+  )
+  // A session row opens on a double-click; two real clicks at the same point.
   await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
   await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 2 })
@@ -233,7 +244,7 @@ if (hostKeyPrompt) {
   await clickAt(x, y)
 }
 await sleep(3500)
-rec('the test session connects', Boolean(await ev(`document.querySelectorAll('.tab').length`)), `${await ev(`document.querySelectorAll('.tab').length`)} tab(s)`)
+rec('a double-click opens the session exactly once', (await tabCount()) === tabsBefore + 1, `${(await tabCount()) - tabsBefore} new tab(s)`)
 
 // --- open the file pane -----------------------------------------------------
 
@@ -399,6 +410,26 @@ await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', 
 await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65, nativeVirtualKeyCode: 65, modifiers: META })
 await sleep(300)
 rec('⌘A takes the whole listing', (await selected()).length === 6, (await selected()).join(' '))
+
+// --- keyboard open ----------------------------------------------------------
+// A focused button never receives dblclick, so Enter is the keyboard way in.
+// The host is trusted by now, so this connects without a prompt.
+
+rec('the Sessions panel tab is reachable', await click('.panel-tab', 'Sessions'))
+await sleep(300)
+const tabsBeforeEnter = await tabCount()
+const focused = await ev(`(() => {
+  const row = [...document.querySelectorAll('.session-row')]
+    .find(b => b.querySelector('.sname')?.textContent.trim() === ${JSON.stringify(SESSION_NAME)});
+  if (!row) return false;
+  row.focus();
+  return document.activeElement === row;
+})()`)
+rec('the session row takes keyboard focus', Boolean(focused))
+await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 })
+await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 })
+await sleep(2500)
+rec('Enter on a focused session row opens it once', (await tabCount()) === tabsBeforeEnter + 1, `${(await tabCount()) - tabsBeforeEnter} new tab(s)`)
 
 // --- cleanup ----------------------------------------------------------------
 // By name only: the store on this machine holds real saved sessions.

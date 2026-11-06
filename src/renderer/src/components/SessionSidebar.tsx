@@ -45,7 +45,15 @@ export function SessionSidebar({ sessions, onOpen, onEdit, onNew }: Props) {
             <button
               key={session.id}
               className="session-row"
+              // Double-click only: a single click must not connect. Enter is the
+              // keyboard equivalent, since a focused button never sees dblclick.
               onDoubleClick={() => onOpen(session)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.repeat) {
+                  e.preventDefault()
+                  onOpen(session)
+                }
+              }}
               onContextMenu={(e) => {
                 e.preventDefault()
                 onEdit(session)
