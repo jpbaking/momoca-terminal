@@ -9,7 +9,7 @@ Owns code under `src/main/terminals/`. The SSH backend lives in `../ssh/ssh-term
 ## Local Contracts
 - `TerminalBackend` (`backend.ts`) is the seam: `write`, `resize`, `sftp`, `dispose`, emitting `data`, `exit` and `error`. Every session type is one more implementation of it.
 - `createBackend` in `registry.ts` is the only place that branches on session kind. The IPC layer and the renderer never switch on protocol.
-- Mosh, Rsh, FTP and RDP run their native client as a `LocalTerminal` with a command override. A missing client or X display is a connect-time error shown in the tab, never a silent exit. Add a new kind here, not in `ipc.ts`.
+- Mosh, Rsh and FTP run their native client as a `LocalTerminal` with a command override. Kinds in `EXTERNAL_KINDS` (RDP, VNC, Browser, XDMCP) never reach the registry; they launch through `../external-tools.ts`. Add a new tab kind here, not in `ipc.ts`.
 - Output is coalesced before it is sent as `term:data` (`FLUSH_MS` 4ms, `FLUSH_BYTES` 64 KiB). Keep sends batched; one message per chunk floods the renderer.
 - Local shells are login shells (`-l`) so the user's normal `PATH` and Homebrew setup apply.
 - Telnet answers option negotiation itself so IAC bytes never reach the terminal.

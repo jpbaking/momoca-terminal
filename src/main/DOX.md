@@ -27,7 +27,7 @@ Owns everything under `src/main/`. The SSH protocol layer, persistence and termi
 - **Network tools** — ping, port scan, subnet discovery with reverse DNS and ARP. Start: `net-tools.ts`.
 - **Toolbox backend** — processes, hardware, listening ports, Wake-on-LAN, key generation, local text and diff, Homebrew. Start: `tools.ts`.
 - **Unix command catalogue** — installed tools and BSD-versus-GNU differences. Start: `unix-tools.ts`.
-- **External tools** — requirement checks, X display discovery, launching native clients. Start: `external-tools.ts`.
+- **External tools** — requirement checks, starting XQuartz, launching native clients for RDP, VNC, Browser and XDMCP. Start: `external-tools.ts`.
 
 ## Child DOX Index
 - ssh/ — ssh2 connections: SSH terminal backend, host keys, SFTP operations, transfer progress, tunnels, SOCKS5, remote stats.
