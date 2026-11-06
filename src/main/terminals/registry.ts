@@ -164,6 +164,9 @@ export async function create(options: ConnectOptions, sender: WebContents): Prom
     if (!sender.isDestroyed()) queue(tabId, sender, data)
   })
   backend.on('exit', ({ code, signal }: { code: number | null; signal?: string }) => {
+    // A backend that was closed (or replaced by a reconnect) may still report
+    // its exit late; it must not tear down whatever now holds this tab.
+    if (terminals.get(tabId) !== backend) return
     terminals.delete(tabId)
     pollers.get(tabId)?.stop()
     pollers.delete(tabId)

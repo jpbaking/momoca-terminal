@@ -155,6 +155,9 @@ copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
     for the X11 client, and shows FreeRDP's error if it can't connect.
 - **Tabbed terminals** — local login shells and SSH, WebGL-rendered, 20k lines of
   scrollback. `⌘T` new tab, `⌘W` close, `⌘1`–`⌘9` switch, middle-click to close.
+  When a session ends (the shell exits, the SSH connection drops, or it fails
+  to connect) the tab stays with its scrollback: **Enter** closes it, **R**
+  reconnects (or reopens the shell) in the same tab.
 - **Scrolling** — a real, always-visible scrollbar in the terminal and every
   list, wheel/trackpad scrolling, `⇧PageUp`/`⇧PageDown`/`⇧Home`/`⇧End` and
   `⌘↑`/`⌘↓` for scrollback (swallowed rather than leaked to the shell as stray

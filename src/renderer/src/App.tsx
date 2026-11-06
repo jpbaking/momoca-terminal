@@ -720,6 +720,8 @@ export function App() {
                   onFocus={() => setActiveId(tab.tabId)}
                   onTitle={setTitle}
                   onCwd={setCwd}
+                  onStatus={setTabStatus}
+                  onClose={closeTab}
                 />
               )
             })}

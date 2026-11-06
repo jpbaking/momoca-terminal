@@ -25,6 +25,7 @@ Owns everything under `src/renderer/`, including `src/components/tools/` and `sr
 - File lists follow Finder's rules: click selects, ⌘-click toggles, Shift-click takes a range, ⌘A takes everything, double-click opens. Right-clicking inside a selection acts on all of it; outside one, it reselects that row.
 - Every bar or mode that can hide itself keeps a way back (a shortcut and a visible control). A mode with no exit is a trap.
 - MultiExec is off at launch and never persisted.
+- A terminal tab whose session ended or failed to connect stays open and offers two keys: Enter closes the tab, R starts the same session again in place (same `tabId`, scrollback kept). Every other key is ignored, and nothing typed then reaches a backend, a macro or MultiExec. `test/suites/sessionend.mjs` asserts this.
 - In an RDP tab, ⌘C ⌘V ⌘X ⌘A ⌘Z ⌘Y ⌘S go to Windows as Ctrl shortcuts (`COMMAND_AS_CTRL` in `rdp-keys.ts`), ⌘ tapped alone is the Windows key, and every other ⌘ shortcut still reaches MoMoca. `test/suites/rdptest.mjs` asserts that ⌘T still opens a tab and a plain key does not.
 
 ## Verification
@@ -33,7 +34,7 @@ Owns everything under `src/renderer/`, including `src/components/tools/` and `sr
 ## Feature Map
 - **App shell and tabs** — tab lifecycle, quick connect, backend events, layout, keyboard shortcuts. Start: `src/App.tsx`. Files: `src/components/TabBar.tsx`, `src/components/StatusBar.tsx`, `src/components/WelcomeTab.tsx`, `src/main.tsx`.
 - **RDP pane** — IronRDP session on a canvas: connect through `rdp:open`, fill-the-tab resizing, keyboard (scancodes, ⌘ mapping), mouse, cursor, clipboard text, Reconnect. Start: `src/components/RdpPane.tsx`. Files: `src/rdp-keys.ts`.
-- **Terminal pane** — xterm with WebGL, scrollback, search, the "lines below" chip, split positioning. Start: `src/components/TerminalPane.tsx`. Files: `src/terminal-registry.ts`, `src/view-state.ts`, `src/theme.ts`.
+- **Terminal pane** — xterm with WebGL, scrollback, search, the "lines below" chip, split positioning, Enter-to-close / R-to-reconnect once the session ends. Start: `src/components/TerminalPane.tsx`. Files: `src/terminal-registry.ts`, `src/view-state.ts`, `src/theme.ts`.
 - **Menus and ribbon** — the menu bar and buttons bar from shared definitions, View options, compact mode. Start: `src/menus.ts`. Files: `src/components/MenuBar.tsx`, `src/components/Ribbon.tsx`, `src/components/ContextMenu.tsx`, `src/components/SettingsDialog.tsx`, `src/components/AboutDialog.tsx`.
 - **Sidebar dock** — resize by dragging the inner edge, fold to a rail (⌘B), hover the rail to float the panel out. Start: `src/components/LeftPanel.tsx`. Files: `src/view-state.ts` (`sidebarWidth`, `sidebarCollapsed`), `src/styles.css` (`.sidebar-dock`), `../../test/suites/sidebartest.mjs`.
 - **Session sidebar and dialog** — the folder tree of saved sessions, the session editor, and the session-type strip. Start: `src/components/SessionSidebar.tsx`. Files: `src/components/LeftPanel.tsx`, `src/components/SessionDialog.tsx`, `src/components/SessionTypePicker.tsx`, `src/components/SessionTypeIcons.tsx`, `src/components/ToolGuide.tsx`.

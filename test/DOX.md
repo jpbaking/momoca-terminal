@@ -26,6 +26,7 @@ Owns `sshd.mjs`, `README.md`, `suites/` (no doc of its own), and the gitignored 
 - **Menus** — Start: `suites/menutest.mjs`.
 - **Sidebar resize, fold and hover peek** — wants a throwaway `--user-data-dir`. Start: `suites/sidebartest.mjs`.
 - **Escape stack** — Start: `suites/esctest.mjs`.
+- **Ended sessions** — the tab stays, R reopens in place, Enter closes. Start: `suites/sessionend.mjs`.
 - **Macro editing and multi-terminal runs** — Start: `suites/macroedit.mjs`.
 - **Tools, network tools, Unix catalogue** — Start: `suites/toolstest.mjs`.
 - **SFTP selection UI and session opening** — Start: `suites/sftpui.mjs`.

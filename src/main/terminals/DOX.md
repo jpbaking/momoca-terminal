@@ -13,6 +13,7 @@ Owns code under `src/main/terminals/`. The SSH backend lives in `../ssh/ssh-term
 - Output is coalesced before it is sent as `term:data` (`FLUSH_MS` 4ms, `FLUSH_BYTES` 64 KiB). Keep sends batched; one message per chunk floods the renderer.
 - Local shells are login shells (`-l`) so the user's normal `PATH` and Homebrew setup apply.
 - Telnet answers option negotiation itself so IAC bytes never reach the terminal.
+- A tab may be created again under the same `tabId` after its backend exits (the renderer's reconnect). A backend's `exit` is acted on only while it is still the tab's current backend, so a late exit from a closed or replaced one tears nothing down.
 - Per-tab remote stats pollers are owned by the registry and torn down with their terminal.
 
 ## Feature Map

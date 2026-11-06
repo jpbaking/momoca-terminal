@@ -28,6 +28,7 @@ if your shell can't find it.
 | `scrolltest.mjs` | Terminal scrollbar, wheel, keyboard scrollback, jump-to-bottom, panel scrolling |
 | `viewtest.mjs` | Split layouts, MultiExec, View menu, zoom, compact mode |
 | `macroedit.mjs` | Macro editing, playback speed, running on several terminals at once |
+| `sessionend.mjs` | A tab whose session ended: other keys ignored, R reopens in place, Enter closes |
 | `toolstest.mjs` | Network tools, macro store, Unix command catalogue |
 | `rdptest.mjs` | RDP in a tab through the IronRDP gateway, against FreeRDP's sample server (needs `brew install freerdp`; see its header) |
 

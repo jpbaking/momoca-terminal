@@ -25,6 +25,10 @@ interface Props {
   connect: Omit<ConnectOptions, 'cols' | 'rows'>
   onTitle: (tabId: string, title: string) => void
   onCwd: (tabId: string, cwd: string) => void
+  /** Sets the tab's status dot; used when a dead tab reconnects or fails to. */
+  onStatus: (tabId: string, status: TabState['status'], error?: string) => void
+  /** Closes this tab, as Enter does once its session has ended. */
+  onClose: (tabId: string) => void
 }
 
 export function TerminalPane({
@@ -37,7 +41,9 @@ export function TerminalPane({
   onFocus,
   connect,
   onTitle,
-  onCwd
+  onCwd,
+  onStatus,
+  onClose
 }: Props) {
   const visible = slot !== null
   const hostRef = useRef<HTMLDivElement>(null)
@@ -48,8 +54,8 @@ export function TerminalPane({
   const { tabId } = tab
 
   // Callbacks live in a ref so the terminal is built exactly once per tab.
-  const handlers = useRef({ onTitle, onCwd })
-  handlers.current = { onTitle, onCwd }
+  const handlers = useRef({ onTitle, onCwd, onStatus, onClose })
+  handlers.current = { onTitle, onCwd, onStatus, onClose }
 
   // Same for the theme: read at construction, then updated by its own effect.
   const themeRef = useRef(theme)
@@ -178,7 +184,57 @@ export function TerminalPane({
 
       return true
     })
+    // Once the session has ended (or never started) the tab waits for Enter
+    // to close it or R to start the same session again in place, keeping the
+    // scrollback. Nothing typed then reaches a backend, a macro or MultiExec.
+    let ended = false
+    const again = tab.kind === 'local' ? 'reopen the shell' : 'reconnect'
+    const offerChoices = (notice: string) => {
+      ended = true
+      // A program that died in the alternate screen (vim, top) would leave the
+      // notice there, mouse reporting on and the cursor hidden: go back to the
+      // normal screen, turn mouse and paste modes off and soft-reset, keeping
+      // the scrollback. The empty write waits for the last output to be parsed
+      // so the buffer check sees the screen the program left.
+      term.write('', () => {
+        const leaveAlt = term.buffer.active.type === 'alternate' ? '\x1b[?1049l' : ''
+        term.write(
+          `${leaveAlt}\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[!p` +
+            `\r\n${notice}\r\n` +
+            `\x1b[2mPress \x1b[0;1mEnter\x1b[0;2m to close this tab, or \x1b[0;1mR\x1b[0;2m to ${again}.\x1b[0m\r\n`
+        )
+      })
+    }
+
+    const start = async () => {
+      // A backend left behind by a half-finished create would block the new
+      // one ("already exists"); after a normal exit this is a no-op.
+      await window.api.term.close(tabId).catch(() => {})
+      try {
+        await window.api.term.create({ ...connect, tabId, cols: term.cols, rows: term.rows })
+      } catch (err) {
+        const message = (err as Error).message
+        handlers.current.onStatus(tabId, 'error', message)
+        offerChoices(`\x1b[31mConnection failed: ${message}\x1b[0m`)
+      }
+    }
+
+    const decide = (data: string) => {
+      if (data === '\r') {
+        handlers.current.onClose(tabId)
+      } else if (data === 'r' || data === 'R') {
+        ended = false
+        term.write(`\r\n\x1b[2m${tab.kind === 'local' ? 'Reopening' : 'Reconnecting'}…\x1b[0m\r\n`)
+        handlers.current.onStatus(tabId, 'connecting')
+        void start()
+      }
+    }
+
     term.onData((data) => {
+      if (ended) {
+        decide(data)
+        return
+      }
       // Tap the same bytes the backend gets, so a macro records exactly what
       // was typed — control characters included.
       recordInput(tabId, data)
@@ -193,14 +249,10 @@ export function TerminalPane({
       if (p.tabId === tabId) term.write(p.data)
     })
     const offExit = window.api.term.onExit((p) => {
-      if (p.tabId === tabId) term.write('\r\n\x1b[2m[session closed]\x1b[0m\r\n')
+      if (p.tabId === tabId) offerChoices('\x1b[2m[session closed]\x1b[0m')
     })
 
-    void window.api.term
-      .create({ ...connect, tabId, cols: term.cols, rows: term.rows })
-      .catch((err: Error) => {
-        term.write(`\r\n\x1b[31mConnection failed: ${err.message}\x1b[0m\r\n`)
-      })
+    void start()
 
     const observer = new ResizeObserver(() => {
       // Zero-size while hidden; fitting then would send a bogus 1x1 window.
