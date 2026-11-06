@@ -1,8 +1,9 @@
 import { execFile, spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
-import { shell } from 'electron'
-import type { SavedSession, ToolCheck, ToolId } from '@shared/types'
+import { app, shell } from 'electron'
+import type { RdpOptions, SavedSession, ToolCheck, ToolId } from '@shared/types'
 
 const run = promisify(execFile)
 
@@ -183,13 +184,156 @@ export async function startXServer(): Promise<{
   return { launched: true, message: 'Started XQuartz — X11 clients can use $DISPLAY' }
 }
 
+type LaunchResult = { launched: boolean; message: string; tool?: ToolId }
+
+/** How a handoff gets a password without the renderer ever holding a stored one. */
+export interface ExternalCredentials {
+  /** The secret stored under a vault id, or null. */
+  lookupSecret: (vaultId: string) => Promise<string | null>
+  /** Ask the user. Null means they cancelled. */
+  askPassword: (title: string, prompt: string) => Promise<string | null>
+}
+
+/** XQuartz's socket for display :0. */
+const X_SOCKET = '/tmp/.X11-unix/X0'
+const X_START_TIMEOUT_MS = 15_000
+
+/**
+ * FreeRDP's X11 client needs a display, and an app started from Finder has no
+ * `$DISPLAY`. Start XQuartz if it isn't running and wait for :0 to appear.
+ */
+async function ensureXDisplay(): Promise<string | null> {
+  if (existsSync(X_SOCKET)) return ':0'
+  if (!(await checkTool('xquartz'))?.available) return null
+  spawn('/usr/bin/open', ['-a', 'XQuartz'], { detached: true, stdio: 'ignore' }).unref()
+  for (let waited = 0; waited < X_START_TIMEOUT_MS; waited += 250) {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    if (existsSync(X_SOCKET)) return ':0'
+  }
+  return null
+}
+
+/** The X11 builds are named xfreerdp; the SDL build draws its own native window. */
+const needsXServer = (binary: string): boolean => /\/xfreerdp3?$/.test(binary)
+
+/** A FreeRDP that is still running after this long has got past connecting and logging in. */
+const EARLY_EXIT_MS = 5_000
+const LOG_ROTATE_BYTES = 1024 * 1024
+
+/** FreeRDP refuses a size outside roughly this range; out-of-range values fall back to its default. */
+const RDP_MIN_SIDE = 200
+const RDP_MAX_SIDE = 8192
+
+const validSide = (n: number | undefined): n is number =>
+  Number.isInteger(n) && n! >= RDP_MIN_SIDE && n! <= RDP_MAX_SIDE
+
+/** The session dialog's RDP options as FreeRDP arguments. Audio uses the macOS backend. */
+function rdpOptionArgs(options: RdpOptions = {}): string[] {
+  const args: string[] = []
+  if (options.fullscreen) args.push('+f')
+  else if (validSide(options.width) && validSide(options.height)) {
+    args.push(`/size:${options.width}x${options.height}`)
+  }
+  if (options.dynamicResolution) args.push('+dynamic-resolution')
+  if (options.playAudio) args.push('/sound:sys:mac')
+  if (options.microphone) args.push('/microphone:sys:mac')
+  args.push(options.clipboard === false ? '-clipboard' : '/clipboard')
+  return args
+}
+
+/** The last `[ERROR]` FreeRDP wrote since `from`, without its timestamp and source prefix. */
+function lastFreeRdpError(logPath: string, from: number): string | null {
+  try {
+    const lines = readFileSync(logPath).subarray(from).toString('utf8').split('\n')
+    const error = lines.reverse().find((line) => line.includes('[ERROR]'))
+    return error ? error.replace(/^.*\]: /, '').trim() : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Run FreeRDP against a session, with its password.
+ *
+ * Arguments go in on stdin (`/args-from:stdin`, one per line), so the password
+ * never appears in argv, where `ps` shows it to every user on this Mac. Output
+ * goes to a log file rather than a pipe: the session must outlive this app,
+ * and a pipe would close when the app quits. A FreeRDP that dies within a few
+ * seconds reports its own error instead of failing silently.
+ */
+async function launchFreeRdp(
+  binary: string,
+  session: SavedSession,
+  credentials: ExternalCredentials
+): Promise<LaunchResult> {
+  const host = session.host ?? ''
+  const port = session.port ?? 3389
+  const env = { ...process.env }
+
+  if (needsXServer(binary)) {
+    const display = await ensureXDisplay()
+    if (!display) {
+      return { launched: false, message: 'FreeRDP needs XQuartz, which did not start', tool: 'xquartz' }
+    }
+    env.DISPLAY = display
+  }
+
+  const label = session.username ? `${session.username}@${host}` : host
+  const stored = session.id ? await credentials.lookupSecret(session.id) : null
+  const password = stored ?? (await credentials.askPassword(label, `RDP password for ${label}:`))
+  // Without a password FreeRDP asks for one on a terminal that a handoff does
+  // not have, and waits there for ever.
+  if (!password) return { launched: false, message: 'RDP connection cancelled — no password given' }
+  if (/[\r\n]/.test(password)) {
+    return { launched: false, message: 'FreeRDP cannot take a password containing a line break' }
+  }
+
+  const args = [`/v:${host}:${port}`, '/cert:ignore', ...rdpOptionArgs(session.rdp)]
+  if (session.username) args.push(`/u:${session.username}`)
+  args.push(`/p:${password}`)
+
+  const logPath = join(app.getPath('logs'), 'freerdp.log')
+  mkdirSync(dirname(logPath), { recursive: true })
+  const size = existsSync(logPath) ? statSync(logPath).size : 0
+  const from = size > LOG_ROTATE_BYTES ? 0 : size
+  const log = openSync(logPath, from === 0 ? 'w' : 'a', 0o600)
+
+  const child = spawn(binary, ['/args-from:stdin'], {
+    env,
+    detached: true,
+    stdio: ['pipe', log, log]
+  })
+  closeSync(log)
+  child.stdin?.on('error', () => {}) // FreeRDP exiting before reading stdin is reported below.
+  child.stdin?.end(`${args.join('\n')}\n`)
+  child.unref()
+
+  const exit = await new Promise<number | 'running'>((resolve) => {
+    const timer = setTimeout(() => resolve('running'), EARLY_EXIT_MS)
+    child.once('exit', (code) => {
+      clearTimeout(timer)
+      resolve(code ?? -1)
+    })
+    child.once('error', () => {
+      clearTimeout(timer)
+      resolve(-1)
+    })
+  })
+
+  if (exit === 'running') return { launched: true, message: `Started FreeRDP against ${host}` }
+  if (exit === 0) return { launched: true, message: `FreeRDP session to ${host} ended` }
+  const reason = lastFreeRdpError(logPath, from) ?? `exit code ${exit}`
+  return { launched: false, message: `FreeRDP could not connect to ${host}: ${reason}` }
+}
+
 /**
  * Session kinds that hand off to another application rather than opening a tab.
  * Returns a human-readable outcome for the UI to show.
  */
 export async function launchExternal(
-  session: SavedSession
-): Promise<{ launched: boolean; message: string; tool?: ToolId }> {
+  session: SavedSession,
+  credentials: ExternalCredentials
+): Promise<LaunchResult> {
   const host = session.host ?? ''
   const user = session.username
 
@@ -217,10 +361,7 @@ export async function launchExternal(
         await shell.openExternal(`rdp://full%20address=s:${host}:${session.port ?? 3389}`)
         return { launched: true, message: `Handed ${host} to ${tool.detail.split('/').pop()}` }
       }
-      const args = [`/v:${host}:${session.port ?? 3389}`, '/cert:ignore']
-      if (user) args.push(`/u:${user}`)
-      spawn(tool.detail!, args, { detached: true, stdio: 'ignore' }).unref()
-      return { launched: true, message: `Started FreeRDP against ${host}` }
+      return launchFreeRdp(tool.detail!, session, credentials)
     }
 
     case 'xdmcp': {

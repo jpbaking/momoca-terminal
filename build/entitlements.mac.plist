@@ -11,5 +11,8 @@
     <true/>
     <key>com.apple.security.inherit</key>
     <true/>
+    <!-- FreeRDP, run by this app, forwards the microphone into RDP sessions that ask for it. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
   </dict>
 </plist>

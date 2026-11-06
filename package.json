@@ -59,6 +59,9 @@
           ]
         }
       ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "MoMoca passes your microphone to remote desktop sessions you turn it on for."
+      },
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "hardenedRuntime": true,

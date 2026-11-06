@@ -5,6 +5,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import type { ConnectOptions, Macro, SavedSession, ScanTarget, SftpEntry, Tunnel } from '@shared/types'
 import { checkTools, launchExternal, startXServer } from './external-tools'
 import * as net from './net-tools'
+import { createPrompter } from './prompts'
 import { checkUnixTools } from './unix-tools'
 import * as toolbox from './tools'
 import * as macros from './store/macros'
@@ -367,7 +368,17 @@ export function registerIpc(): void {
 
   // --- external tools -----------------------------------------------------
   handle('tools:check', () => checkTools())
-  handle('tools:launch', (_e, session: SavedSession) => launchExternal(session))
+  handle('tools:launch', (event, session: SavedSession) => {
+    // A saved session is re-read from the store, so a stored password only
+    // ever goes to the host saved alongside it, never one the renderer names.
+    const target = (session.id && sessions.getSession(session.id)) || { ...session, id: '' }
+    const prompter = createPrompter(event.sender, 'external')
+    return launchExternal(target, {
+      lookupSecret: (vaultId) => secrets.revealSecret(vaultId),
+      askPassword: async (title, prompt) =>
+        (await prompter.askSecret('password', title, [{ prompt, echo: false }]))?.[0] ?? null
+    })
+  })
 
   // --- network tools ------------------------------------------------------
   handle('net:scan', (event, target: ScanTarget) => net.scanPorts(target, event.sender))

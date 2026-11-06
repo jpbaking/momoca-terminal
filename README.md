@@ -119,7 +119,12 @@ simply unsigned, and users need the right-click-Open dance above.
   compact mode.
 - **Session types** — twelve of them, and every one is live. SSH, SFTP, Telnet,
   Serial, Shell, FTP, Rsh and Mosh open in a tab; RDP, VNC, Browser and XDMCP
-  hand off to the right external app. A type whose client isn't installed is
+  hand off to the right external app. RDP through FreeRDP uses the password
+  saved with the session (Keychain) or asks for it, passes it on stdin rather
+  than the command line, starts XQuartz for the X11 client, and shows
+  FreeRDP's error if it can't connect. Each RDP session sets its screen size
+  (a preset, custom, or full screen), resize-with-window, sound on this Mac,
+  microphone passthrough and two-way clipboard. A type whose client isn't installed is
   **disabled in the picker** with a dot and a reason on hover, so you can't
   choose something that would fail at connect time. **Requirements** in the
   ribbon lists what's installed with copy-paste install commands for what isn't;

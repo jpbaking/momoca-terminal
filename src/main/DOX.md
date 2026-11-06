@@ -13,6 +13,8 @@ Owns everything under `src/main/`. The SSH protocol layer, persistence and termi
 - No channel returns a stored secret to the renderer. `revealSecret` is called only from main-side code that needs the secret to connect.
 - File dialogs are attached to the requesting window (see `ipc.ts`), never parentless: a parentless macOS panel can hide behind another app.
 - A GUI app launched from Finder has a minimal `PATH`. Resolve binaries through `external-tools.ts`, which adds the Homebrew prefixes.
+- A FreeRDP handoff gets its arguments, password included, on stdin (`/args-from:stdin`), never in argv where `ps` shows them. `tools:launch` re-reads a saved session from the store so a stored password goes only to its saved host. FreeRDP's output goes to `~/Library/Logs/MoMoca/freerdp.log` (not a pipe, so the session outlives the app). An early exit reports FreeRDP's last error. The X11 client (`xfreerdp`) gets XQuartz started and `DISPLAY=:0` set first.
+- A session's RDP options (`SavedSession.rdp`) become FreeRDP arguments in `rdpOptionArgs` only. macOS attributes FreeRDP's microphone use to MoMoca, so the app keeps `com.apple.security.device.audio-input` in `build/entitlements.mac.plist` and `NSMicrophoneUsageDescription` in `package.json` `build.mac.extendInfo`. Removing either one silently mutes the mic.
 - Repeating probes use `execFile`, not `exec`, and do sorting and trimming in JS (see `system-stats.ts`).
 - User-triggered jobs that can grow (scans, sweeps) are cancellable and have hard ceilings that refuse absurd input with a reason (see `net-tools.ts`).
 - Stats polling costs nothing while the diagnostics bar is hidden: `stats-poll.ts` polls only what the renderer has declared it needs.

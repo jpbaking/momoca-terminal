@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useEscape } from '../hooks/useEscape'
-import type { AuthMethod, ImportedKey, SavedSession, SessionKind, ToolId } from '@shared/types'
+import {
+  RDP_SIZE_PRESETS,
+  type AuthMethod,
+  type ImportedKey,
+  type RdpOptions,
+  type SavedSession,
+  type SessionKind,
+  type ToolId
+} from '@shared/types'
 import { useExclusive } from '../hooks/useExclusive'
 import { SessionTypePicker } from './SessionTypePicker'
+
+/** Which entry of the screen-size picker a saved session's options select. */
+function rdpSizeChoice(options?: RdpOptions): string {
+  if (options?.fullscreen) return 'fullscreen'
+  if (!options?.width || !options.height) return 'default'
+  const key = `${options.width}x${options.height}`
+  return RDP_SIZE_PRESETS.some((p) => `${p.width}x${p.height}` === key) ? key : 'custom'
+}
 
 interface Props {
   initial: SavedSession | null
@@ -93,6 +109,24 @@ export function SessionDialog({
 
   const set = <K extends keyof SavedSession>(key: K, value: SavedSession[K]) =>
     setDraft((current) => ({ ...current, [key]: value }))
+
+  const rdp = draft.rdp ?? {}
+  const setRdp = (patch: Partial<RdpOptions>) =>
+    setDraft((current) => ({ ...current, rdp: { ...current.rdp, ...patch } }))
+  const [sizeChoice, setSizeChoice] = useState(() => rdpSizeChoice(initial?.rdp))
+
+  const chooseSize = (choice: string) => {
+    setSizeChoice(choice)
+    if (choice === 'fullscreen') setRdp({ fullscreen: true, width: undefined, height: undefined })
+    else if (choice === 'default') setRdp({ fullscreen: false, width: undefined, height: undefined })
+    else if (choice === 'custom') {
+      // Start from whatever size was showing, so Custom is a tweak rather than a blank.
+      setRdp({ fullscreen: false, width: rdp.width ?? 1920, height: rdp.height ?? 1080 })
+    } else {
+      const [width, height] = choice.split('x').map(Number)
+      setRdp({ fullscreen: false, width, height })
+    }
+  }
 
   const changeKind = (kind: SessionKind) =>
     setDraft((current) => ({
@@ -294,6 +328,98 @@ export function SessionDialog({
               </div>
             )}
           </>
+        )}
+
+        {draft.kind === 'rdp' && (
+          <div className="field">
+            <label>Password — stored in the macOS Keychain, optional</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Leave blank to be asked when you connect"
+            />
+          </div>
+        )}
+
+        {draft.kind === 'rdp' && (
+          <div className="inset">
+            <div className="field-row">
+              <div className="field" style={{ flex: 2 }}>
+                <label>Screen size</label>
+                <select value={sizeChoice} onChange={(e) => chooseSize(e.target.value)}>
+                  <option value="default">FreeRDP default (1024 × 768)</option>
+                  {RDP_SIZE_PRESETS.map(({ width, height }) => (
+                    <option key={`${width}x${height}`} value={`${width}x${height}`}>
+                      {width} × {height}
+                    </option>
+                  ))}
+                  <option value="custom">Custom…</option>
+                  <option value="fullscreen">Full screen</option>
+                </select>
+              </div>
+              {sizeChoice === 'custom' && (
+                <>
+                  <div className="field" style={{ width: 92 }}>
+                    <label>Width</label>
+                    <input
+                      type="number"
+                      min={200}
+                      max={8192}
+                      value={rdp.width ?? ''}
+                      onChange={(e) => setRdp({ width: Number(e.target.value) || undefined })}
+                    />
+                  </div>
+                  <div className="field" style={{ width: 92 }}>
+                    <label>Height</label>
+                    <input
+                      type="number"
+                      min={200}
+                      max={8192}
+                      value={rdp.height ?? ''}
+                      onChange={(e) => setRdp({ height: Number(e.target.value) || undefined })}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={rdp.dynamicResolution ?? false}
+                onChange={(e) => setRdp({ dynamicResolution: e.target.checked })}
+              />
+              Resize the remote desktop with the window
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={rdp.playAudio ?? false}
+                onChange={(e) => setRdp({ playAudio: e.target.checked })}
+              />
+              Play the remote computer&rsquo;s sound on this Mac
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={rdp.microphone ?? false}
+                onChange={(e) => setRdp({ microphone: e.target.checked })}
+              />
+              Use this Mac&rsquo;s microphone in the session
+            </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={rdp.clipboard ?? true}
+                onChange={(e) => setRdp({ clipboard: e.target.checked })}
+              />
+              Share the clipboard both ways
+            </label>
+            <p className="hint">
+              These apply when FreeRDP runs the session. Windows App uses its own settings.
+            </p>
+          </div>
         )}
 
         {draft.kind === 'ssh' && (

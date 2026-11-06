@@ -93,7 +93,33 @@ export interface SavedSession {
   baudRate?: number
   /** Commands run once the shell is interactive. */
   initCommands?: string[]
+  /** Display and redirection for kind === 'rdp'. FreeRDP only; Windows App keeps its own. */
+  rdp?: RdpOptions
 }
+
+export interface RdpOptions {
+  /** Full screen, or a window of `width` × `height` (FreeRDP's default size when unset). */
+  fullscreen?: boolean
+  width?: number
+  height?: number
+  /** Resize the remote desktop when the window resizes. */
+  dynamicResolution?: boolean
+  /** Play the remote computer's sound on this Mac. */
+  playAudio?: boolean
+  /** Pass this Mac's microphone into the session. */
+  microphone?: boolean
+  /** Share the clipboard both ways. Unset means on, as in FreeRDP. */
+  clipboard?: boolean
+}
+
+/** Window sizes the RDP screen-size picker offers before "Custom". */
+export const RDP_SIZE_PRESETS: { width: number; height: number }[] = [
+  { width: 1280, height: 720 },
+  { width: 1440, height: 900 },
+  { width: 1600, height: 900 },
+  { width: 1920, height: 1080 },
+  { width: 2560, height: 1440 }
+]
 
 /**
  * Port forwarding, matching ssh's -L / -R / -D.
