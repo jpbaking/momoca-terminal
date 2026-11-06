@@ -99,6 +99,13 @@ programmatic API, and a newer major makes its worker hang with no output at all.
 Signing is optional. Without a Developer ID the DMG still builds and runs; it is
 simply unsigned, and users need the right-click-Open dance above.
 
+RDP tabs use IronRDP's web client from `vendor/iron-remote-desktop-rdp`, built
+from a pinned IronRDP commit because npm's 0.7.0 lacks fixes they need (xrdp's
+screen updates drew sheared without them). A normal build uses the committed
+copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
+`cargo install wasm-pack --version 0.15.0 --locked`, change the commit in
+`scripts/build-ironrdp.sh`, and run it.
+
 ## What works today
 
 - **Desktop chrome** — a menu bar (Terminal, Sessions, View, X server,
@@ -375,6 +382,7 @@ src/
   preload/        contextBridge API surface (the renderer has no Node access)
   renderer/src/   React UI
   shared/         Types crossing all three
+vendor/           IronRDP's web client, built from source by scripts/build-ironrdp.sh
 ```
 
 The design rule worth preserving: `TerminalBackend` is the seam. A local pty, an
