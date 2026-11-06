@@ -18,8 +18,11 @@ export type SessionKind =
   | 'browser'
   | 'xdmcp'
 
-/** Session kinds that hand off to another app instead of opening a terminal tab. */
-export const EXTERNAL_KINDS: SessionKind[] = ['rdp', 'vnc', 'browser', 'xdmcp']
+/**
+ * Session kinds that hand off to another app instead of opening a tab. RDP is
+ * not listed: it opens in a tab unless its engine is FreeRDP (`RdpOptions.engine`).
+ */
+export const EXTERNAL_KINDS: SessionKind[] = ['vnc', 'browser', 'xdmcp']
 
 export type ToolId = 'vnc' | 'browser' | 'mosh' | 'freerdp' | 'xquartz' | 'ftp' | 'rsh'
 
@@ -33,7 +36,6 @@ export const KIND_REQUIREMENT: Partial<Record<SessionKind, ToolId>> = {
   mosh: 'mosh',
   ftp: 'ftp',
   rsh: 'rsh',
-  rdp: 'freerdp',
   vnc: 'vnc',
   browser: 'browser',
   xdmcp: 'xquartz'
@@ -93,23 +95,57 @@ export interface SavedSession {
   baudRate?: number
   /** Commands run once the shell is interactive. */
   initCommands?: string[]
-  /** Display and redirection for kind === 'rdp'. FreeRDP only; Windows App keeps its own. */
+  /** Engine, display and redirection for kind === 'rdp'. Windows App keeps its own settings. */
   rdp?: RdpOptions
 }
 
+/**
+ * Which client runs an RDP session. `ironrdp` draws it in a tab; `freerdp`
+ * hands it to FreeRDP's own window (or Windows App), which adds sound,
+ * microphone and full screen.
+ */
+export type RdpEngine = 'ironrdp' | 'freerdp'
+
 export interface RdpOptions {
-  /** Full screen, or a window of `width` × `height` (FreeRDP's default size when unset). */
+  /** Unset means `ironrdp`: in a tab. */
+  engine?: RdpEngine
+  /** FreeRDP only: full screen instead of a window. */
   fullscreen?: boolean
+  /**
+   * The remote desktop's size. Unset means the tab's size at connect time
+   * (IronRDP) or FreeRDP's default window.
+   */
   width?: number
   height?: number
-  /** Resize the remote desktop when the window resizes. */
+  /** Resize the remote desktop with its tab or window. In a tab it then fills the tab. */
   dynamicResolution?: boolean
-  /** Play the remote computer's sound on this Mac. */
+  /** FreeRDP only: play the remote computer's sound on this Mac. */
   playAudio?: boolean
-  /** Pass this Mac's microphone into the session. */
+  /** FreeRDP only: pass this Mac's microphone into the session. */
   microphone?: boolean
   /** Share the clipboard both ways. Unset means on, as in FreeRDP. */
   clipboard?: boolean
+}
+
+/** The session an IronRDP tab connects: a saved one by id (read from the store), or an unsaved one. */
+export interface RdpTarget {
+  sessionId?: string
+  session?: Omit<SavedSession, 'id'>
+}
+
+/**
+ * What an IronRDP tab needs to connect, from `rdp:open`. `authToken` is a
+ * single-use ticket for the loopback gateway at `proxyAddress`, bound to the
+ * session's host. The password is the one stored secret the renderer receives.
+ */
+export interface RdpTicket {
+  proxyAddress: string
+  authToken: string
+  destination: string
+  username: string
+  domain: string
+  password: string
+  options: RdpOptions
 }
 
 /** Window sizes the RDP screen-size picker offers before "Custom". */

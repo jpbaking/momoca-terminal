@@ -9,6 +9,7 @@ Owns everything under `src/renderer/`, including `src/components/tools/` and `sr
 ## Local Contracts
 - No Node, no Electron imports. Talk to the system only through `window.api`. Import shared types from `@shared/types`; renderer modules import each other by relative path.
 - A `TerminalPane` mounts once per tab and is never re-parented or remounted: remounting drops the session. Split layouts position panes over the terminal area instead of moving them between subtrees. Code that needs a tab's live xterm uses `terminal-registry.ts`; values the terminal reads after construction go through `view-state.ts`.
+- An RDP tab is an `RdpPane`, which follows the same mount-once, positioned-over-its-slot rule as `TerminalPane`; unmounting it shuts the session down. It loads `@devolutions/iron-remote-desktop-rdp` with a dynamic `import()`, so the 6 MB WebAssembly chunk loads with the first RDP tab, not at startup. That module fetches its WebAssembly from a `data:` URL and connects to the gateway on `ws://127.0.0.1`, which is why the CSP in `index.html` allows both in `connect-src`. RDP tabs are left out of MultiExec's targets.
 - `main.tsx` deliberately does not use `StrictMode`: its double-invoked effects would open two backends and two SSH logins per tab.
 - High-frequency data stays out of React state. Diagnostics metrics live in `stats-store.ts` so a tick re-renders only the bar.
 - Menus are data in `menus.ts`. The menu bar and the ribbon's buttons both render from it. Change a label or command there, not in a component.
@@ -23,12 +24,14 @@ Owns everything under `src/renderer/`, including `src/components/tools/` and `sr
 - File lists follow Finder's rules: click selects, ⌘-click toggles, Shift-click takes a range, ⌘A takes everything, double-click opens. Right-clicking inside a selection acts on all of it; outside one, it reselects that row.
 - Every bar or mode that can hide itself keeps a way back (a shortcut and a visible control). A mode with no exit is a trap.
 - MultiExec is off at launch and never persisted.
+- In an RDP tab, ⌘C ⌘V ⌘X ⌘A ⌘Z ⌘Y ⌘S go to Windows as Ctrl shortcuts (`COMMAND_AS_CTRL` in `rdp-keys.ts`), ⌘ tapped alone is the Windows key, and every other ⌘ shortcut still reaches MoMoca. `test/suites/rdptest.mjs` asserts that ⌘T still opens a tab and a plain key does not.
 
 ## Verification
 - `npm run typecheck`, then the relevant CDP suite in `test/suites/` against a fresh app launch.
 
 ## Feature Map
 - **App shell and tabs** — tab lifecycle, quick connect, backend events, layout, keyboard shortcuts. Start: `src/App.tsx`. Files: `src/components/TabBar.tsx`, `src/components/StatusBar.tsx`, `src/components/WelcomeTab.tsx`, `src/main.tsx`.
+- **RDP pane** — IronRDP session on a canvas: connect through `rdp:open`, fill-the-tab resizing, keyboard (scancodes, ⌘ mapping), mouse, cursor, clipboard text, Reconnect. Start: `src/components/RdpPane.tsx`. Files: `src/rdp-keys.ts`.
 - **Terminal pane** — xterm with WebGL, scrollback, search, the "lines below" chip, split positioning. Start: `src/components/TerminalPane.tsx`. Files: `src/terminal-registry.ts`, `src/view-state.ts`, `src/theme.ts`.
 - **Menus and ribbon** — the menu bar and buttons bar from shared definitions, View options, compact mode. Start: `src/menus.ts`. Files: `src/components/MenuBar.tsx`, `src/components/Ribbon.tsx`, `src/components/ContextMenu.tsx`, `src/components/SettingsDialog.tsx`, `src/components/AboutDialog.tsx`.
 - **Session sidebar and dialog** — the folder tree of saved sessions, the session editor, and the session-type strip. Start: `src/components/SessionSidebar.tsx`. Files: `src/components/LeftPanel.tsx`, `src/components/SessionDialog.tsx`, `src/components/SessionTypePicker.tsx`, `src/components/SessionTypeIcons.tsx`, `src/components/ToolGuide.tsx`.

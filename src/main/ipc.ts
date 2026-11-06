@@ -2,8 +2,17 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { rm, writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import type { ConnectOptions, Macro, SavedSession, ScanTarget, SftpEntry, Tunnel } from '@shared/types'
-import { checkTools, launchExternal, startXServer } from './external-tools'
+import type {
+  ConnectOptions,
+  Macro,
+  RdpTarget,
+  SavedSession,
+  ScanTarget,
+  SftpEntry,
+  Tunnel
+} from '@shared/types'
+import { checkTools, launchExternal, startXServer, type ExternalCredentials } from './external-tools'
+import { openRdpSession } from './rdp-gateway'
 import * as net from './net-tools'
 import { createPrompter } from './prompts'
 import { checkUnixTools } from './unix-tools'
@@ -368,16 +377,29 @@ export function registerIpc(): void {
 
   // --- external tools -----------------------------------------------------
   handle('tools:check', () => checkTools())
-  handle('tools:launch', (event, session: SavedSession) => {
-    // A saved session is re-read from the store, so a stored password only
-    // ever goes to the host saved alongside it, never one the renderer names.
-    const target = (session.id && sessions.getSession(session.id)) || { ...session, id: '' }
-    const prompter = createPrompter(event.sender, 'external')
-    return launchExternal(target, {
+  // A saved session is re-read from the store, so a stored password only ever
+  // goes to the host saved alongside it, never one the renderer names.
+  const storedSession = (session: SavedSession): SavedSession =>
+    (session.id && sessions.getSession(session.id)) || { ...session, id: '' }
+  const credentialsFor = (sender: Electron.WebContents): ExternalCredentials => {
+    const prompter = createPrompter(sender, 'external')
+    return {
       lookupSecret: (vaultId) => secrets.revealSecret(vaultId),
       askPassword: async (title, prompt) =>
         (await prompter.askSecret('password', title, [{ prompt, echo: false }]))?.[0] ?? null
-    })
+    }
+  }
+  handle('tools:launch', (event, session: SavedSession) =>
+    launchExternal(storedSession(session), credentialsFor(event.sender))
+  )
+  // An IronRDP tab: the one channel that returns a stored secret to the
+  // renderer (see rdp-gateway.ts), and only with its own host's ticket.
+  handle('rdp:open', (event, target: RdpTarget) => {
+    const session = target.sessionId
+      ? sessions.getSession(target.sessionId)
+      : target.session && { ...target.session, id: '' }
+    if (!session || session.kind !== 'rdp') throw new Error('No such RDP session')
+    return openRdpSession(session, credentialsFor(event.sender))
   })
 
   // --- network tools ------------------------------------------------------

@@ -10,7 +10,8 @@ Owns everything under `src/main/`. The SSH protocol layer, persistence and termi
 - Every renderer-callable channel is registered in `ipc.ts` through `handle()`, which returns `{ ok: true, value }` or `{ ok: false, error }` so errors reach the renderer as readable rejections. Never call `ipcMain.handle` directly elsewhere. The only other listener is `prompt:respond` in `prompts.ts`.
 - Main asks the renderer for user input mid-operation (host keys, passwords, 2FA) only through `prompts.ts`, which must resolve, never leak, the pending promise if the window goes away.
 - Pushes to the renderer (`webContents.send`) are for streams and progress only: terminal data, transfer progress, stats, tunnel state, network-tool results.
-- No channel returns a stored secret to the renderer. `revealSecret` is called only from main-side code that needs the secret to connect.
+- No channel returns a stored secret to the renderer, with one exception: `rdp:open` returns an RDP session's stored password, because IronRDP runs CredSSP in the renderer. It reads the session from the store by id (never one the renderer describes), and returns the password only together with a ticket for that session's own host. Add no other exception. `revealSecret` is otherwise called only from main-side code that needs the secret to connect.
+- The RDP gateway (`rdp-gateway.ts`) listens on 127.0.0.1 only. A connection reaches a server only with a ticket from `rdp:open`: random, single-use, expiring after a minute, and bound to one host and port. The client's own `destination` is ignored. RDP servers' self-signed certificates are accepted, as the FreeRDP handoff's `/cert:ignore` does.
 - File dialogs are attached to the requesting window (see `ipc.ts`), never parentless: a parentless macOS panel can hide behind another app.
 - A GUI app launched from Finder has a minimal `PATH`. Resolve binaries through `external-tools.ts`, which adds the Homebrew prefixes.
 - A FreeRDP handoff gets its arguments, password included, on stdin (`/args-from:stdin`), never in argv where `ps` shows them. `tools:launch` re-reads a saved session from the store so a stored password goes only to its saved host. FreeRDP's output goes to `~/Library/Logs/MoMoca/freerdp.log` (not a pipe, so the session outlives the app). An early exit reports FreeRDP's last error. The X11 client (`xfreerdp`) gets XQuartz started and `DISPLAY=:0` set first.
@@ -29,7 +30,8 @@ Owns everything under `src/main/`. The SSH protocol layer, persistence and termi
 - **Network tools** — ping, port scan, subnet discovery with reverse DNS and ARP. Start: `net-tools.ts`.
 - **Toolbox backend** — processes, hardware, listening ports, Wake-on-LAN, key generation, local text and diff, Homebrew. Start: `tools.ts`.
 - **Unix command catalogue** — installed tools and BSD-versus-GNU differences. Start: `unix-tools.ts`.
-- **External tools** — requirement checks, starting XQuartz, launching native clients for RDP, VNC, Browser and XDMCP. Start: `external-tools.ts`.
+- **External tools** — requirement checks, starting XQuartz, launching native clients for VNC, Browser, XDMCP and RDP on the FreeRDP engine. Start: `external-tools.ts`.
+- **RDP gateway** — the RDCleanPath WebSocket an IronRDP tab connects through: tickets, X.224 relay, TLS to the server, then a byte relay. Start: `rdp-gateway.ts`.
 
 ## Child DOX Index
 - ssh/ — ssh2 connections: SSH terminal backend, host keys, SFTP operations, transfer progress, tunnels, SOCKS5, remote stats.

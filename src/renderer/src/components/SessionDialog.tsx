@@ -77,7 +77,7 @@ const NEEDS_AUTH: SessionKind[] = ['ssh', 'sftp']
 const KIND_NOTE: Partial<Record<SessionKind, string>> = {
   vnc: 'Opens in macOS Screen Sharing — no extra software needed.',
   browser: 'Opens the host in your default browser.',
-  rdp: 'Opens in FreeRDP or Windows App, whichever is installed.',
+  rdp: 'Opens in a tab, or in FreeRDP’s own window when it needs sound or a microphone.',
   xdmcp: 'Starts an X server on display :1 via XQuartz and queries the host.',
   ftp: 'Runs the ftp client in a tab. FTP sends credentials in the clear — prefer SFTP.',
   rsh: 'Runs the rsh client in a tab. Unencrypted — only on a trusted network.',
@@ -114,6 +114,18 @@ export function SessionDialog({
   const setRdp = (patch: Partial<RdpOptions>) =>
     setDraft((current) => ({ ...current, rdp: { ...current.rdp, ...patch } }))
   const [sizeChoice, setSizeChoice] = useState(() => rdpSizeChoice(initial?.rdp))
+  const engine = rdp.engine ?? 'ironrdp'
+  const inTab = engine === 'ironrdp'
+  /** Whether FreeRDP (or Windows App) is installed; null until checked. */
+  const [freeRdp, setFreeRdp] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (draft.kind !== 'rdp') return
+    void window.api.tools
+      .check()
+      .then((tools) => setFreeRdp(tools.some((t) => t.id === 'freerdp' && t.available)))
+      .catch(() => setFreeRdp(null))
+  }, [draft.kind])
 
   const chooseSize = (choice: string) => {
     setSizeChoice(choice)
@@ -344,21 +356,53 @@ export function SessionDialog({
 
         {draft.kind === 'rdp' && (
           <div className="inset">
+            <div className="field">
+              <label>Opens in</label>
+              <select
+                value={engine}
+                onChange={(e) => {
+                  const next = e.target.value as RdpOptions['engine']
+                  setRdp({ engine: next })
+                  // A tab has no full screen of its own.
+                  if (next === 'ironrdp' && sizeChoice === 'fullscreen') chooseSize('default')
+                }}
+              >
+                <option value="ironrdp">A tab (IronRDP)</option>
+                <option value="freerdp" disabled={freeRdp === false && engine !== 'freerdp'}>
+                  Its own window (FreeRDP){freeRdp === false ? ' — not installed' : ''}
+                </option>
+              </select>
+              {freeRdp === false && (
+                <p className="hint">
+                  The window adds sound, microphone and full screen.{' '}
+                  <button type="button" className="linklike" onClick={() => onOpenGuide('freerdp')}>
+                    Install FreeRDP
+                  </button>
+                </p>
+              )}
+            </div>
+
             <div className="field-row">
               <div className="field" style={{ flex: 2 }}>
                 <label>Screen size</label>
-                <select value={sizeChoice} onChange={(e) => chooseSize(e.target.value)}>
-                  <option value="default">FreeRDP default (1024 × 768)</option>
+                <select
+                  value={sizeChoice}
+                  disabled={inTab && rdp.dynamicResolution === true}
+                  onChange={(e) => chooseSize(e.target.value)}
+                >
+                  <option value="default">
+                    {inTab ? 'The tab’s size when it connects' : 'FreeRDP default (1024 × 768)'}
+                  </option>
                   {RDP_SIZE_PRESETS.map(({ width, height }) => (
                     <option key={`${width}x${height}`} value={`${width}x${height}`}>
                       {width} × {height}
                     </option>
                   ))}
                   <option value="custom">Custom…</option>
-                  <option value="fullscreen">Full screen</option>
+                  {!inTab && <option value="fullscreen">Full screen</option>}
                 </select>
               </div>
-              {sizeChoice === 'custom' && (
+              {sizeChoice === 'custom' && !(inTab && rdp.dynamicResolution) && (
                 <>
                   <div className="field" style={{ width: 92 }}>
                     <label>Width</label>
@@ -390,8 +434,12 @@ export function SessionDialog({
                 checked={rdp.dynamicResolution ?? false}
                 onChange={(e) => setRdp({ dynamicResolution: e.target.checked })}
               />
-              Resize the remote desktop with the window
+              {inTab
+                ? 'Fill the tab, and resize the remote desktop with it'
+                : 'Resize the remote desktop with the window'}
             </label>
+            {!inTab && (
+              <>
             <label className="checkbox">
               <input
                 type="checkbox"
@@ -408,6 +456,8 @@ export function SessionDialog({
               />
               Use this Mac&rsquo;s microphone in the session
             </label>
+              </>
+            )}
             <label className="checkbox">
               <input
                 type="checkbox"
@@ -417,7 +467,9 @@ export function SessionDialog({
               Share the clipboard both ways
             </label>
             <p className="hint">
-              These apply when FreeRDP runs the session. Windows App uses its own settings.
+              {inTab
+                ? 'Sound and the microphone need FreeRDP’s window. In the tab, ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⌘Y and ⌘S act as Ctrl shortcuts, and ⌘ on its own is the Windows key.'
+                : 'Windows App, when it runs the session instead of FreeRDP, uses its own settings.'}
             </p>
           </div>
         )}

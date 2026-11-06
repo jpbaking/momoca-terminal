@@ -29,6 +29,7 @@ if your shell can't find it.
 | `viewtest.mjs` | Split layouts, MultiExec, View menu, zoom, compact mode |
 | `macroedit.mjs` | Macro editing, playback speed, running on several terminals at once |
 | `toolstest.mjs` | Network tools, macro store, Unix command catalogue |
+| `rdptest.mjs` | RDP in a tab through the IronRDP gateway, against FreeRDP's sample server (needs `brew install freerdp`; see its header) |
 
 ## Two rules they follow
 

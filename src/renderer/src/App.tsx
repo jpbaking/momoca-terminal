@@ -42,6 +42,7 @@ import { SessionDialog } from './components/SessionDialog'
 import { StatusBar } from './components/StatusBar'
 import { TabBar } from './components/TabBar'
 import { TerminalPane } from './components/TerminalPane'
+import { RdpPane } from './components/RdpPane'
 import { WelcomeTab } from './components/WelcomeTab'
 import { loadTheme, persistTheme, type ThemeName } from './theme'
 
@@ -190,9 +191,11 @@ export function App() {
 
   /** Returns the new tab's id, or null for kinds handed to another app. */
   const openTab = useCallback((session: SavedSession | Omit<SavedSession, 'id'>): string | null => {
-    // RDP, VNC, Browser and XDMCP are handed to another application rather
-    // than rendered in a tab; a missing client opens the requirements guide.
-    if (EXTERNAL_KINDS.includes(session.kind)) {
+    // VNC, Browser and XDMCP (and RDP on the FreeRDP engine) are handed to
+    // another application rather than rendered in a tab; a missing client
+    // opens the requirements guide.
+    const freeRdp = session.kind === 'rdp' && session.rdp?.engine === 'freerdp'
+    if (EXTERNAL_KINDS.includes(session.kind) || freeRdp) {
       void window.api.tools
         .launch(session as SavedSession)
         .then((result) => {
@@ -254,6 +257,13 @@ export function App() {
   const setTitle = useCallback((tabId: string, title: string) => {
     setTabs((current) =>
       current.map((tab) => (tab.tabId === tabId ? { ...tab, title: title || tab.title } : tab))
+    )
+  }, [])
+
+  /** RDP tabs report their own state; terminal tabs get theirs from main. */
+  const setTabStatus = useCallback((tabId: string, status: TabState['status'], error?: string) => {
+    setTabs((current) =>
+      current.map((tab) => (tab.tabId === tabId ? { ...tab, status, error } : tab))
     )
   }, [])
 
@@ -569,18 +579,21 @@ export function App() {
   })()
 
   // MultiExec's 'all' scope and its target picker both need the full list.
+  // It types into terminals, so RDP tabs are left out.
+  const terminalTabs = tabs.filter((t) => t.kind !== 'rdp').map((t) => t.tabId)
   useEffect(() => {
-    viewActions.setOpenTabs(tabs.map((t) => t.tabId))
-  }, [tabs.map((t) => t.tabId).join('|')])
+    viewActions.setOpenTabs(terminalTabs)
+  }, [terminalTabs.join('|')])
 
   // What MultiExec would actually type into right now, for the banner and the
   // picker's ticks. Recomputed per render so it tracks the store.
   const execTargets = multiExecSelection()
 
   // MultiExec broadcasts to exactly what is on screen.
+  const visibleTerminals = paneTabs.filter((id) => terminalTabs.includes(id))
   useEffect(() => {
-    viewActions.setVisibleTabs(paneTabs)
-  }, [paneTabs.join('|')])
+    viewActions.setVisibleTabs(visibleTerminals)
+  }, [visibleTerminals.join('|')])
 
   const menuState = {
     view,
@@ -673,6 +686,21 @@ export function App() {
             */}
             {tabs.map((tab) => {
               const slot = paneTabs.indexOf(tab.tabId)
+              if (tab.kind === 'rdp') {
+                const connect = connects.current.get(tab.tabId)!
+                return (
+                  <RdpPane
+                    key={tab.tabId}
+                    tab={tab}
+                    slot={slot === -1 ? null : PANE_RECTS[view.layout][slot]}
+                    focused={tab.tabId === activeId}
+                    split={paneCount > 1}
+                    target={{ sessionId: connect.sessionId, session: connect.session }}
+                    onFocus={() => setActiveId(tab.tabId)}
+                    onStatus={setTabStatus}
+                  />
+                )
+              }
               return (
                 <TerminalPane
                   key={tab.tabId}

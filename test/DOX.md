@@ -12,6 +12,7 @@ Owns `sshd.mjs`, `README.md`, `suites/` (no doc of its own), and the gitignored 
 - Assert on side effects, not the screen. WebGL terminal text never reaches the DOM, so prove a command ran by having the shell write a file and checking it from Node.
 - This machine's stores hold the maintainer's real data. A suite touches only its own fixtures, found by name: its own saved sessions, its own `known_hosts` line (`[127.0.0.1]:2222`), and its own folders under `.artifacts/`. Never delete or restore those stores wholesale.
 - Suites assume a freshly launched app. Restart the app between runs; leftover panel or tab state from an earlier run causes false failures.
+- `rdptest.mjs` starts Homebrew FreeRDP's `sfreerdp-server` with `--local-only` (a Unix socket) and reaches it through its own loopback relay, so no test server listens on the network. That server has no Display Control channel, so the suite reports dynamic resize as SKIP; check it against a Windows host.
 - `sshd.mjs` accepts one generated key, serves a real `/bin/sh`, implements enough SFTP for the file browser (with `lstat` in readdir so symlinks report as symlinks), honours `direct-tcpip`, and answers the stats probe as if it were Linux.
 
 ## Verification
@@ -29,6 +30,7 @@ Owns `sshd.mjs`, `README.md`, `suites/` (no doc of its own), and the gitignored 
 - **SFTP selection UI and session opening** — Start: `suites/sftpui.mjs`.
 - **SFTP selection on disk** — Start: `suites/sftpselect.mjs`.
 - **SFTP transfers** — Start: `suites/sftptransfer.mjs`.
+- **RDP in a tab and its gateway tickets** — against FreeRDP's sample server on a Unix socket. Start: `suites/rdptest.mjs`.
 
 ## Child DOX Index
 - (none)

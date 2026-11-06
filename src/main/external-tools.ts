@@ -75,7 +75,7 @@ const TOOLS: ToolDef[] = [
   {
     id: 'freerdp',
     name: 'FreeRDP or Windows App',
-    purpose: 'RDP sessions',
+    purpose: 'RDP in its own window (sound, microphone, full screen)',
     detect: async () => {
       const binary = await which('xfreerdp3') ?? await which('xfreerdp')
       if (binary) return { available: true, detail: binary }
@@ -84,7 +84,7 @@ const TOOLS: ToolDef[] = [
     },
     install: {
       summary:
-        'RDP needs an external client — there is no usable JavaScript RDP implementation to embed.',
+        'RDP opens in a tab without this. A session set to open in its own window needs FreeRDP, which adds sound, the microphone and full screen.',
       steps: [
         { label: 'Command-line client (opens its own window)', command: 'brew install freerdp' },
         { label: 'Or install Windows App from the Mac App Store' }

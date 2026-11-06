@@ -6,6 +6,8 @@ import type {
   HardwareInfo,
   ListeningPort,
   ProcessInfo,
+  RdpTarget,
+  RdpTicket,
   ImportedKey,
   Macro,
   PingSample,
@@ -155,6 +157,11 @@ const api = {
       invoke<{ launched: boolean; message: string; tool?: ToolId }>('tools:launch', session),
     startXServer: () =>
       invoke<{ launched: boolean; message: string; tool?: ToolId }>('tools:startXServer')
+  },
+
+  rdp: {
+    /** Gateway ticket and credentials for an in-tab (IronRDP) session. */
+    open: (target: RdpTarget) => invoke<RdpTicket>('rdp:open', target)
   },
 
   tunnels: {

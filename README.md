@@ -118,18 +118,26 @@ simply unsigned, and users need the right-click-Open dance above.
   `⌘⇧M` for the menu bar, a chevron in the tab strip for the ribbon, `⌘⇧E` for
   compact mode.
 - **Session types** — twelve of them, and every one is live. SSH, SFTP, Telnet,
-  Serial, Shell, FTP, Rsh and Mosh open in a tab; RDP, VNC, Browser and XDMCP
-  hand off to the right external app. RDP through FreeRDP uses the password
-  saved with the session (Keychain) or asks for it, passes it on stdin rather
-  than the command line, starts XQuartz for the X11 client, and shows
-  FreeRDP's error if it can't connect. Each RDP session sets its screen size
-  (a preset, custom, or full screen), resize-with-window, sound on this Mac,
-  microphone passthrough and two-way clipboard. A type whose client isn't installed is
+  Serial, Shell, FTP, Rsh, Mosh and RDP open in a tab; VNC, Browser and XDMCP
+  hand off to the right external app. A type whose client isn't installed is
   **disabled in the picker** with a dot and a reason on hover, so you can't
   choose something that would fail at connect time. **Requirements** in the
   ribbon lists what's installed with copy-paste install commands for what isn't;
   `KIND_REQUIREMENT` in `shared/types.ts` is the single map both the picker and
   the launcher read, so they can't disagree.
+- **RDP** — each session picks where it opens, and both ways use the password
+  saved with the session (Keychain) or ask for it.
+  - *In a tab* (the default): drawn by IronRDP (WebAssembly) through a
+    loopback-only gateway in the main process, with nothing to install. "Fill
+    the tab" makes the remote desktop the tab's size and resizes it with the
+    tab; a fixed size scales down to fit. Clipboard text goes both ways. `⌘C`
+    `⌘V` `⌘X` `⌘A` `⌘Z` `⌘Y` `⌘S` act as their Ctrl shortcuts, `⌘` tapped alone
+    is the Windows key, and every other `⌘` shortcut stays MoMoca's. No sound
+    or microphone in a tab.
+  - *In its own window*: hands the session to FreeRDP (or Windows App), which
+    adds sound on this Mac, microphone passthrough and full screen. FreeRDP
+    gets the password on stdin rather than the command line, starts XQuartz
+    for the X11 client, and shows FreeRDP's error if it can't connect.
 - **Tabbed terminals** — local login shells and SSH, WebGL-rendered, 20k lines of
   scrollback. `⌘T` new tab, `⌘W` close, `⌘1`–`⌘9` switch, middle-click to close.
 - **Scrolling** — a real, always-visible scrollbar in the terminal and every
@@ -350,7 +358,8 @@ Deliberately out of scope for the first pass, roughly in order of cost:
 |---|---|
 | Drag & drop upload | HTML5 drop target on the file pane, then the existing upload IPC |
 | Syntax highlighting in the editor | Swap the textarea for CodeMirror 6; the IPC already fits |
-| Embedded VNC / RDP | `noVNC` + a WS bridge; RDP would need `guacd`. Today both hand off to a native client |
+| Embedded VNC | `noVNC` + a WS bridge, like the RDP gateway. Today it hands off to Screen Sharing |
+| Sound in an RDP tab | IronRDP's web build has no audio output or microphone yet; use the window engine |
 
 ## Layout
 
