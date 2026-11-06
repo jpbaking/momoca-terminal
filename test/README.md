@@ -17,8 +17,16 @@ npm run build
 node test/suites/humantest.mjs
 ```
 
-Node is at `/opt/homebrew/bin/node`; prefix with `PATH="/opt/homebrew/bin:$PATH"`
-if your shell can't find it.
+Use whatever `node` is on your `PATH` (Homebrew, nvm, …); the suites need
+Node 22 or later for the built-in `WebSocket`. Before running an SSH suite,
+check that `sshd.mjs` is listening:
+
+```bash
+lsof -nP -iTCP:2222 -sTCP:LISTEN
+```
+
+If it failed to start, the SSH tabs only fail to connect and the suite reports
+a wall of unrelated FAILs.
 
 ## The suites
 
