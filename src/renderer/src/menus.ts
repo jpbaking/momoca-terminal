@@ -144,7 +144,7 @@ export function viewMenuItems(state: MenuState, act: MenuActions): MenuItem[] {
     { label: 'Terminal unzoom', hint: '⌘−', onClick: () => act.zoom(-1) },
     { label: `Reset zoom (${view.fontSize}px)`, hint: '⌘0', onClick: act.resetZoom },
     {},
-    { label: 'Show/hide sidebar', checked: state.sidebarOpen, onClick: act.toggleSidebar },
+    { label: 'Dock sidebar (else fold to a rail)', hint: '⌘B', checked: state.sidebarOpen, onClick: act.toggleSidebar },
     {
       label: 'Put sidebar on the left',
       checked: view.sidebarSide === 'left',

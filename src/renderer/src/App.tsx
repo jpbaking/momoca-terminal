@@ -97,7 +97,6 @@ export function App() {
   const { ask, dialog: promptDialog } = usePrompt()
 
   const [theme, setTheme] = useState<ThemeName>(loadTheme)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [panel, setPanel] = useState<PanelTab>('sessions')
 
   const connects = useRef(new Map<string, TabConnect>())
@@ -363,7 +362,7 @@ export function App() {
     setButtonSize: viewActions.setButtonSize,
     zoom: viewActions.zoom,
     resetZoom: viewActions.resetZoom,
-    toggleSidebar: () => setSidebarOpen((open) => !open),
+    toggleSidebar: viewActions.toggleSidebar,
     setSidebarSide: viewActions.setSidebarSide,
     toggleTabNumbers: viewActions.toggleTabNumbers,
     toggleTabClose: viewActions.toggleTabClose,
@@ -527,6 +526,9 @@ export function App() {
         // Compact mode hides the ribbon, so it needs a way out that is not in it.
         event.preventDefault()
         viewActions.toggleCompact()
+      } else if (event.key === 'b') {
+        event.preventDefault()
+        viewActions.toggleSidebar()
       } else if (event.key === '0') {
         event.preventDefault()
         viewActions.resetZoom()
@@ -595,6 +597,7 @@ export function App() {
     viewActions.setVisibleTabs(visibleTerminals)
   }, [visibleTerminals.join('|')])
 
+  const sidebarOpen = !view.sidebarCollapsed
   const menuState = {
     view,
     theme,
@@ -642,7 +645,7 @@ export function App() {
             recording={recorder.recording}
             onGuide={() => setGuide({})}
             activeTunnels={activeTunnels}
-            onToggleSidebar={() => setSidebarOpen((v) => !v)}
+            onToggleSidebar={viewActions.toggleSidebar}
             onToggleFiles={() => setPanel((p) => (p === 'sftp' ? 'sessions' : 'sftp'))}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             onExit={() => window.close()}
@@ -654,18 +657,21 @@ export function App() {
       </div>
 
       <div className="body">
-        {sidebarOpen && (
-          <LeftPanel
-            sessions={sessions}
-            activeTab={activeTab}
-            panel={panel}
-            onPanel={setPanel}
-            onOpen={openTab}
-            onEdit={(session) => setEditing({ session })}
-            onNew={() => setEditing({ session: null })}
-            onQuickConnect={quickConnect}
-          />
-        )}
+        {/* Collapsed, the panel stays mounted behind its rail, so peeking at it
+            does not re-list the SFTP directory or lose the tree's state. */}
+        <LeftPanel
+          sessions={sessions}
+          activeTab={activeTab}
+          panel={panel}
+          onPanel={setPanel}
+          onOpen={openTab}
+          onEdit={(session) => setEditing({ session })}
+          onNew={() => setEditing({ session: null })}
+          onQuickConnect={quickConnect}
+          collapsed={view.sidebarCollapsed}
+          side={view.sidebarSide}
+          width={view.sidebarWidth}
+        />
 
         <div className="main">
           <TabBar
@@ -864,7 +870,7 @@ export function App() {
           theme={theme}
           onTheme={setTheme}
           sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          onToggleSidebar={viewActions.toggleSidebar}
           onClose={() => setSettings(null)}
         />
       )}

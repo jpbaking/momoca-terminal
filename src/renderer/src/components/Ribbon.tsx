@@ -177,7 +177,7 @@ export function Ribbon(props: Props) {
         label="Sessions"
         onClick={props.onToggleSidebar}
         active={props.sidebarOpen}
-        title="Show or hide the sessions panel"
+        title="Dock the sessions panel, or fold it to a rail that opens on hover (⌘B)"
       />
       <RibbonButton
         icon={<IconFiles />}

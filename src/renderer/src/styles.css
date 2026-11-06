@@ -307,14 +307,121 @@ textarea:focus {
 
 /* ---------- sidebar ---------- */
 
+/* The dock holds the panel, and the rail it folds down to. It is the flex
+   child of `.body`, so View ▸ Put sidebar on the right still just reverses the
+   row. */
+.sidebar-dock {
+  position: relative;
+  display: flex;
+  flex: none;
+  min-height: 0;
+}
+
 .sidebar {
+  position: relative;
   width: var(--sidebar-w);
+  /* The terminals keep at least 320px however narrow the window gets. */
+  min-width: 180px;
+  max-width: calc(100vw - 320px);
   flex: none;
   background: var(--bg-chrome);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* The inner edge drags. Wider than the 1px border it sits on, so it is easy to
+   catch, and it straddles that border rather than eating into the panel. */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:focus-visible,
+body.resizing-sidebar .sidebar-resizer {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+  outline: none;
+}
+
+/* While dragging, the whole window shows the resize cursor and nothing selects. */
+body.resizing-sidebar,
+body.resizing-sidebar * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* Folded: only the rail takes up room. The panel stays mounted but slides out
+   of view, and floats back out over the terminals while the rail is hovered —
+   it never pushes them, so a peek does not resize any terminal. */
+.sidebar-rail {
+  width: 28px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: 6px;
+  background: var(--bg-chrome);
+  border-right: 1px solid var(--border);
+}
+
+.rail-btn.active {
+  background: var(--bg-raised);
+}
+
+.rail-btn:disabled {
+  opacity: 0.4;
+}
+
+.sidebar-dock.collapsed {
+  z-index: 30;
+}
+
+.sidebar-dock.collapsed .sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition:
+    transform 140ms ease-out,
+    visibility 0s linear 140ms;
+}
+
+/* `transform: none`, not a zero translate: any transform would make the panel
+   the containing block for its fixed-position context menus. */
+.sidebar-dock.collapsed.peek .sidebar {
+  transform: none;
+  visibility: visible;
+  box-shadow: 8px 0 28px var(--shadow);
+  transition: transform 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-dock.collapsed .sidebar,
+  .sidebar-dock.collapsed.peek .sidebar {
+    transition: none;
+  }
+}
+
+/* Collapse/dock toggle at the end of the panel tabs. Its chevron points left;
+   `.flip` turns it round. */
+.sidebar-toggle {
+  align-self: center;
+  margin: 0 4px;
+}
+
+.sidebar-toggle.flip svg,
+.rail-btn.flip svg {
+  transform: scaleX(-1);
 }
 
 /* The traffic lights float over the very top-left of the window. */
@@ -1592,9 +1699,26 @@ textarea:focus {
   flex-direction: row-reverse;
 }
 
-.app.sidebar-right .sidebar {
+.app.sidebar-right .sidebar,
+.app.sidebar-right .sidebar-rail {
   border-right: none;
   border-left: 1px solid var(--border);
+}
+
+.app.sidebar-right .sidebar-resizer {
+  right: auto;
+  left: -3px;
+}
+
+.app.sidebar-right .sidebar-dock.collapsed .sidebar {
+  left: auto;
+  right: 0;
+  transform: translateX(100%);
+}
+
+.app.sidebar-right .sidebar-dock.collapsed.peek .sidebar {
+  transform: none;
+  box-shadow: -8px 0 28px var(--shadow);
 }
 
 /* ---------- context menu ---------- */

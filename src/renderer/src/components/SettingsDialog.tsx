@@ -23,6 +23,7 @@ const SHORTCUTS: { keys: string; what: string }[] = [
   { keys: '⌘+ / ⌘−', what: 'Terminal zoom and unzoom' },
   { keys: '⌘0', what: 'Reset the terminal zoom' },
   { keys: '⌘⇧E', what: 'Compact mode — hides the menu and buttons bars' },
+  { keys: '⌘B', what: 'Dock the sidebar, or fold it to a rail that opens on hover' },
   { keys: '⌘⇧M', what: 'Show or hide the menu bar' },
   { keys: '⌘M', what: 'Iconify (minimise) the window' },
   { keys: '⌃⌘F', what: 'Fullscreen mode' },
@@ -133,7 +134,7 @@ export function SettingsDialog({
               <h3>Sidebar and tabs</h3>
               <label className="checkbox">
                 <input type="checkbox" checked={sidebarOpen} onChange={onToggleSidebar} />
-                Show sidebar
+                Dock the sidebar (unticked, it folds to a rail and opens on hover)
               </label>
               <label className="checkbox">
                 <input

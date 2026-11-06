@@ -439,3 +439,18 @@ export function IconUploadFolder({ size = 16 }: IconProps) {
     </svg>
   )
 }
+
+/** A chevron pointing left; flipped with CSS where it has to point the other way. */
+export function IconChevron({ size = 14 }: IconProps) {
+  return (
+    <svg {...box(size)}>
+      <path
+        d="M15 5l-7 7 7 7"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

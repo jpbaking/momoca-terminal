@@ -68,6 +68,10 @@ interface ViewState {
   buttonsBar: boolean
   buttonSize: ButtonSize
   sidebarSide: SidebarSide
+  /** Folded down to the rail; hovering the rail floats it out over the terminals. */
+  sidebarCollapsed: boolean
+  /** Docked width in px, dragged from the sidebar's inner edge. */
+  sidebarWidth: number
   tabNumbers: boolean
   tabClose: boolean
 }
@@ -75,6 +79,15 @@ interface ViewState {
 const FONT_MIN = 8
 const FONT_MAX = 28
 const STORAGE_KEY = 'mobaclone.view'
+export const SIDEBAR_MIN = 180
+export const SIDEBAR_MAX = 640
+export const SIDEBAR_DEFAULT = 236
+
+/** Keeps the sidebar inside its bounds, and at least 320px clear for the terminals. */
+export function clampSidebar(width: number): number {
+  const max = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, window.innerWidth - 320))
+  return Math.round(Math.min(max, Math.max(SIDEBAR_MIN, width)))
+}
 
 const DEFAULTS: ViewState = {
   multiExec: false,
@@ -89,6 +102,8 @@ const DEFAULTS: ViewState = {
   buttonsBar: true,
   buttonSize: 'captions',
   sidebarSide: 'left',
+  sidebarCollapsed: false,
+  sidebarWidth: SIDEBAR_DEFAULT,
   tabNumbers: true,
   tabClose: true
 }
@@ -106,6 +121,8 @@ function load(): ViewState {
       buttonsBar: saved.buttonsBar !== false,
       buttonSize: saved.buttonSize ?? DEFAULTS.buttonSize,
       sidebarSide: saved.sidebarSide === 'right' ? 'right' : 'left',
+      sidebarCollapsed: saved.sidebarCollapsed === true,
+      sidebarWidth: clampSidebar(Number(saved.sidebarWidth) || SIDEBAR_DEFAULT),
       tabNumbers: saved.tabNumbers !== false,
       tabClose: saved.tabClose !== false
     }
@@ -130,6 +147,8 @@ function persist(): void {
       buttonsBar: state.buttonsBar,
       buttonSize: state.buttonSize,
       sidebarSide: state.sidebarSide,
+      sidebarCollapsed: state.sidebarCollapsed,
+      sidebarWidth: state.sidebarWidth,
       tabNumbers: state.tabNumbers,
       tabClose: state.tabClose
     })
@@ -190,6 +209,9 @@ export const viewActions = {
   showBothBars: () => emit({ menuBar: true, buttonsBar: true, compact: false }),
   setButtonSize: (buttonSize: ButtonSize) => emit({ buttonSize }),
   setSidebarSide: (sidebarSide: SidebarSide) => emit({ sidebarSide }),
+  toggleSidebar: () => emit({ sidebarCollapsed: !state.sidebarCollapsed }),
+  setSidebarCollapsed: (sidebarCollapsed: boolean) => emit({ sidebarCollapsed }),
+  setSidebarWidth: (width: number) => emit({ sidebarWidth: clampSidebar(width) }),
   toggleTabNumbers: () => emit({ tabNumbers: !state.tabNumbers }),
   toggleTabClose: () => emit({ tabClose: !state.tabClose }),
   /** Settings ▸ Reset configuration. Keeps the live session state alone. */
@@ -203,6 +225,8 @@ export const viewActions = {
       buttonsBar: DEFAULTS.buttonsBar,
       buttonSize: DEFAULTS.buttonSize,
       sidebarSide: DEFAULTS.sidebarSide,
+      sidebarCollapsed: DEFAULTS.sidebarCollapsed,
+      sidebarWidth: DEFAULTS.sidebarWidth,
       tabNumbers: DEFAULTS.tabNumbers,
       tabClose: DEFAULTS.tabClose
     })
@@ -219,6 +243,8 @@ export function exportView(): Record<string, unknown> {
     buttonsBar: state.buttonsBar,
     buttonSize: state.buttonSize,
     sidebarSide: state.sidebarSide,
+    sidebarCollapsed: state.sidebarCollapsed,
+    sidebarWidth: state.sidebarWidth,
     tabNumbers: state.tabNumbers,
     tabClose: state.tabClose
   }
@@ -241,6 +267,8 @@ export function importView(input: Record<string, unknown>): void {
   if (input.sidebarSide === 'left' || input.sidebarSide === 'right') {
     next.sidebarSide = input.sidebarSide
   }
+  if (typeof input.sidebarCollapsed === 'boolean') next.sidebarCollapsed = input.sidebarCollapsed
+  if (typeof input.sidebarWidth === 'number') next.sidebarWidth = clampSidebar(input.sidebarWidth)
   if (typeof input.tabNumbers === 'boolean') next.tabNumbers = input.tabNumbers
   if (typeof input.tabClose === 'boolean') next.tabClose = input.tabClose
   emit(next)

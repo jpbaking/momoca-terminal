@@ -123,7 +123,14 @@ copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
   saved macros, Settings (configuration, keyboard shortcuts, import/export/reset
   configuration) and Help. Every bar that can hide itself has a way back:
   `⌘⇧M` for the menu bar, a chevron in the tab strip for the ribbon, `⌘⇧E` for
-  compact mode.
+  compact mode, and a rail with a dock button (or `⌘B`) for a folded sidebar.
+- **Resizable, foldable sidebar** — drag the sidebar's inner edge to make it
+  wider or narrower (double-click the edge for the default width); the width is
+  remembered. The chevron by the Sessions/SFTP tabs, the ribbon's Sessions
+  button or `⌘B` folds it to a thin rail; resting the pointer on the rail floats
+  the panel out over the terminals without resizing them, and it folds away
+  again when the pointer leaves (not while you are typing in it). The rail's
+  chevron docks it again.
 - **Session types** — twelve of them, and every one is live. SSH, SFTP, Telnet,
   Serial, Shell, FTP, Rsh, Mosh and RDP open in a tab; VNC, Browser and XDMCP
   hand off to the right external app. A type whose client isn't installed is
@@ -312,7 +319,7 @@ copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
   grid. Panes are *positioned* over the
   terminal area rather than being separate React subtrees: re-parenting a
   terminal would unmount it and drop the session.
-- **View menu** — split layout, sessions panel, diagnostics bar, compact mode,
+- **View menu** — split layout, sessions panel (docked or folded, `⌘B`), diagnostics bar, compact mode,
   full screen, and zoom (`⌘+` / `⌘−` / `⌘0`). Compact mode hides the ribbon —
   which is where the View menu lives — so it leaves a chevron in the tab bar and
   a `⌘⇧E` shortcut as ways back. A mode with no exit is a trap.
