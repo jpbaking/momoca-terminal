@@ -111,7 +111,7 @@ const SHIFT = 8
 // the app back where this suite expects it, touching only its own fixtures.
 await ev(`(async () => {
   for (const s of await window.api.sessions.list()) {
-    if (s.name === ${JSON.stringify(SESSION_NAME)}) await window.api.sessions.delete(s.id)
+    if (s.name === ${JSON.stringify(SESSION_NAME)}) await window.api.sessions.remove(s.id)
   }
 })()`)
 await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 })
@@ -436,7 +436,7 @@ rec('Enter on a focused session row opens it once', (await tabCount()) === tabsB
 
 await ev(`(async () => {
   for (const s of await window.api.sessions.list()) {
-    if (s.name === ${JSON.stringify(SESSION_NAME)}) await window.api.sessions.delete(s.id)
+    if (s.name === ${JSON.stringify(SESSION_NAME)}) await window.api.sessions.remove(s.id)
   }
 })()`)
 rmSync(FIXTURE_DIR, { recursive: true, force: true })
