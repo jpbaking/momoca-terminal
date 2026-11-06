@@ -208,10 +208,12 @@ const row = await ev(`(() => {
 })()`)
 rec('the saved session row is reachable', Boolean(row) && JSON.parse(row).reachable)
 if (row) {
-  // A session row opens on a single click; clicking twice opens two tabs.
+  // A session row opens on a double-click; two real clicks at the same point.
   const { x, y } = JSON.parse(row)
   await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
+  await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 2 })
+  await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 2 })
 }
 
 // First contact with the throwaway server is an unknown host. Trust it here and

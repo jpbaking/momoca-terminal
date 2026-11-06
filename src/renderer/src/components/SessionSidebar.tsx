@@ -46,15 +46,14 @@ export function SessionSidebar({ sessions, onOpen, onEdit, onNew }: Props) {
               key={session.id}
               className="session-row"
               onDoubleClick={() => onOpen(session)}
-              onClick={() => onOpen(session)}
               onContextMenu={(e) => {
                 e.preventDefault()
                 onEdit(session)
               }}
               title={
                 session.kind === 'ssh'
-                  ? `${session.username}@${session.host}:${session.port ?? 22} — right-click to edit`
-                  : 'Local shell — right-click to edit'
+                  ? `${session.username}@${session.host}:${session.port ?? 22} — double-click to open, right-click to edit`
+                  : 'Local shell — double-click to open, right-click to edit'
               }
             >
               <span className={`kind-dot ${session.kind}`} />
