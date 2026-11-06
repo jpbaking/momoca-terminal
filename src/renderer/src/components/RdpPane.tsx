@@ -28,8 +28,12 @@ function loadBackend(): Promise<Backend> {
   return backend
 }
 
-/** RDP sizes must be even, and Windows accepts 200–8192 on a side. */
-const desktopSide = (n: number): number => Math.min(8192, Math.max(200, Math.floor(n / 2) * 2))
+/**
+ * Windows accepts 200–8192 on a side. Widths go down to a multiple of 4, as
+ * mstsc does: xrdp draws rows sheared (each one shifted against the last) when
+ * the width is only even. Heights need no alignment, but share the rounding.
+ */
+const desktopSide = (n: number): number => Math.min(8192, Math.max(200, Math.floor(n / 4) * 4))
 const RESIZE_SETTLE_MS = 250
 
 /** IronErrorKind, as numbered by @devolutions/iron-remote-desktop. */

@@ -259,6 +259,93 @@ function certChain(secure: TLSSocket): Buffer[] {
   return chain
 }
 
+// --- autologon ---------------------------------------------------------------
+
+const SEC_INFO_PKT = 0x0040
+const SEC_ENCRYPT = 0x0008
+const INFO_AUTOLOGON = 0x00000008
+/** Client-to-server bytes scanned for the Client Info PDU before giving up. */
+const MAX_SCAN_BYTES = 256 * 1024
+
+/**
+ * Set INFO_AUTOLOGON in a Client Info PDU, in place; false if `frame` is not one.
+ *
+ * IronRDP's web build always sends the user name and password in the Client
+ * Info PDU but never sets the autologon flag, so a server that logs on from
+ * that PDU instead of NLA (xrdp, or Windows without NLA) shows its own login
+ * screen. mstsc and FreeRDP set the flag whenever they have a password. The
+ * flag is one bit in a fixed-size field, so no length changes. The gateway
+ * sees this PDU in the clear because it, not the client, does the TLS.
+ *
+ * Layout: TPKT (4) · X.224 Data (02 F0 80) · MCS Send Data Request (0x64,
+ * initiator 2, channel 2, priority 1, PER length 1–2) · security header
+ * (flags 2, flagsHi 2) · TS_INFO_PACKET (codePage 4, flags 4, …).
+ */
+function setAutologon(frame: Buffer): boolean {
+  if (frame.length < 16 || frame[4] !== 0x02 || frame[5] !== 0xf0 || frame[7] !== 0x64) return false
+  const at = 13 + (frame[13] & 0x80 ? 2 : 1)
+  if (frame.length < at + 12) return false
+  const security = frame.readUInt16LE(at)
+  if (!(security & SEC_INFO_PKT) || security & SEC_ENCRYPT) return false
+  const flagsAt = at + 8
+  frame.writeUInt32LE((frame.readUInt32LE(flagsAt) | INFO_AUTOLOGON) >>> 0, flagsAt)
+  return true
+}
+
+/**
+ * Passes client-to-server bytes through, framing them only until the Client
+ * Info PDU has gone by. Before it come CredSSP messages (DER, 0x30) when NLA
+ * runs, and TPKT-framed MCS PDUs (0x03); anything else, or a stream that runs
+ * long without one, ends the scan and passes through untouched.
+ */
+function clientInfoPatcher(write: (chunk: Buffer) => void): (chunk: Buffer) => void {
+  let scanning = true
+  let scanned = 0
+  let buffer = Buffer.alloc(0)
+  return (chunk) => {
+    if (!scanning) return write(chunk)
+    buffer = buffer.length ? Buffer.concat([buffer, chunk]) : Buffer.from(chunk)
+    scanned += chunk.length
+    while (scanning && buffer.length) {
+      let length: number
+      if (buffer[0] === 0x03) {
+        if (buffer.length < 4) break
+        length = buffer.readUInt16BE(2)
+      } else if (buffer[0] === 0x30) {
+        let element: Tlv | null
+        try {
+          element = readTlv(buffer, 0)
+        } catch {
+          scanning = false
+          break
+        }
+        if (!element) {
+          if (buffer.length > MAX_SCAN_BYTES) scanning = false
+          break
+        }
+        length = element.end
+      } else {
+        scanning = false
+        break
+      }
+      if (length < 4) {
+        scanning = false
+        break
+      }
+      if (buffer.length < length) break
+      const frame = buffer.subarray(0, length)
+      if (frame[0] === 0x03 && setAutologon(frame)) scanning = false
+      write(frame)
+      buffer = buffer.subarray(length)
+    }
+    if (scanned > MAX_SCAN_BYTES) scanning = false
+    if (!scanning && buffer.length) {
+      write(buffer)
+      buffer = Buffer.alloc(0)
+    }
+  }
+}
+
 // --- the WebSocket side -------------------------------------------------------
 
 function toBuffer(data: RawData): Buffer {
@@ -281,6 +368,7 @@ function serve(ws: WebSocket): void {
   let server: Socket | null = null
   let secure: TLSSocket | null = null
   let relaying = false
+  const toServer = clientInfoPatcher((chunk) => secure?.write(chunk))
 
   const close = () => {
     clearTimeout(requestTimer)
@@ -334,7 +422,7 @@ function serve(ws: WebSocket): void {
     secure.on('close', close)
     secure.on('error', close)
     relaying = true
-    if (pending.length) secure.write(pending)
+    if (pending.length) toServer(pending)
     pending = Buffer.alloc(0)
   }
 
@@ -342,7 +430,7 @@ function serve(ws: WebSocket): void {
   ws.on('message', (data) => {
     const chunk = toBuffer(data)
     if (relaying) {
-      secure?.write(chunk)
+      toServer(chunk)
       return
     }
     pending = Buffer.concat([pending, chunk])

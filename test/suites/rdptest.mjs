@@ -167,7 +167,7 @@ async function main() {
   }
   check(Boolean(state?.width), `IronRDP connected through the gateway${state?.width ? '' : ` (${state?.status})`}`)
   if (!state?.width) return finish()
-  const fills = (s) => Math.abs(s.width - s.screenW) <= 2 && Math.abs(s.height - s.screenH) <= 2
+  const fills = (s) => Math.abs(s.width - s.screenW) < 4 && Math.abs(s.height - s.screenH) < 4
   check(fills(state), `the desktop fills the tab (${state.width}x${state.height} in ${Math.round(state.screenW)}x${Math.round(state.screenH)})`)
 
   // 3. The server's picture reached the canvas: more than one colour on screen.

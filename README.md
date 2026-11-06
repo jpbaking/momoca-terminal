@@ -126,7 +126,8 @@ simply unsigned, and users need the right-click-Open dance above.
   `KIND_REQUIREMENT` in `shared/types.ts` is the single map both the picker and
   the launcher read, so they can't disagree.
 - **RDP** — each session picks where it opens, and both ways use the password
-  saved with the session (Keychain) or ask for it.
+  saved with the session (Keychain) or ask for it, and log on with it, so
+  servers such as xrdp skip their own login screen.
   - *In a tab* (the default): drawn by IronRDP (WebAssembly) through a
     loopback-only gateway in the main process, with nothing to install. "Fill
     the tab" makes the remote desktop the tab's size and resizes it with the
