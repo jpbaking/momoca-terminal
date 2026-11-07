@@ -30,6 +30,12 @@ const TYPES: TypeDef[] = [
   { kind: 'mosh', label: 'Mosh', note: 'Roaming SSH' }
 ]
 
+/** Display name of each session type, e.g. "RDP" or "Shell". */
+export const KIND_LABEL = Object.fromEntries(TYPES.map((t) => [t.kind, t.label])) as Record<
+  SessionKind,
+  string
+>
+
 /**
  * MobaXterm's session-type strip. A type whose external client isn't installed
  * is disabled rather than allowed to fail at connect time — the row underneath

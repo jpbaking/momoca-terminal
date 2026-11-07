@@ -41,7 +41,8 @@ const BLANK: SavedSession = {
   trackCwd: true
 }
 
-const DEFAULT_PORT: Partial<Record<SessionKind, number>> = {
+/** Each protocol's standard port; the sidebar hides a saved port that matches. */
+export const DEFAULT_PORT: Partial<Record<SessionKind, number>> = {
   ssh: 22,
   sftp: 22,
   mosh: 22,

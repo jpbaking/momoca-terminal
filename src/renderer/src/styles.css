@@ -21,6 +21,19 @@
   --shadow: rgba(0, 0, 0, 0.5);
   --scroll-thumb: #3a4358;
   --scroll-thumb-hover: #4e5a76;
+  /* Session-type dots in the sidebar, one hue each, ordered round the wheel. */
+  --kind-rsh: #f28b82;
+  --kind-telnet: #ff9e64;
+  --kind-serial: #e6d16a;
+  --kind-local: #9ece6a;
+  --kind-ftp: #5fd39a;
+  --kind-sftp: #6fd8d8;
+  --kind-mosh: #5ab8f0;
+  --kind-ssh: #7aa2f7;
+  --kind-xdmcp: #8c8cf5;
+  --kind-vnc: #b48af7;
+  --kind-rdp: #e28be6;
+  --kind-browser: #f287b8;
 }
 
 :root[data-theme='light'] {
@@ -45,6 +58,19 @@
   --shadow: rgba(30, 40, 60, 0.22);
   --scroll-thumb: #b8bfcd;
   --scroll-thumb-hover: #97a0b2;
+  /* Darker session-type hues so the dots hold up on white. */
+  --kind-rsh: #c62828;
+  --kind-telnet: #d05a00;
+  --kind-serial: #9a7d00;
+  --kind-local: #1a7f37;
+  --kind-ftp: #0f8a5f;
+  --kind-sftp: #00838f;
+  --kind-mosh: #0277bd;
+  --kind-ssh: #2f6fd0;
+  --kind-xdmcp: #4a4fd1;
+  --kind-vnc: #7b3fd1;
+  --kind-rdp: #a52ab0;
+  --kind-browser: #c2185b;
 }
 
 :root {
@@ -510,6 +536,11 @@ body.resizing-sidebar * {
   margin-left: auto;
   padding-left: 6px;
   white-space: nowrap;
+  /* A long host or device path gives way to the name, not the other way round. */
+  flex-shrink: 1;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kind-dot {
@@ -517,14 +548,55 @@ body.resizing-sidebar * {
   height: 7px;
   border-radius: var(--radius-xs);
   flex: none;
+  background: var(--text-dim);
 }
 
-.kind-dot.ssh {
-  background: var(--accent);
+.kind-dot.rsh {
+  background: var(--kind-rsh);
+}
+
+.kind-dot.telnet {
+  background: var(--kind-telnet);
+}
+
+.kind-dot.serial {
+  background: var(--kind-serial);
 }
 
 .kind-dot.local {
-  background: var(--ok);
+  background: var(--kind-local);
+}
+
+.kind-dot.ftp {
+  background: var(--kind-ftp);
+}
+
+.kind-dot.sftp {
+  background: var(--kind-sftp);
+}
+
+.kind-dot.mosh {
+  background: var(--kind-mosh);
+}
+
+.kind-dot.ssh {
+  background: var(--kind-ssh);
+}
+
+.kind-dot.xdmcp {
+  background: var(--kind-xdmcp);
+}
+
+.kind-dot.vnc {
+  background: var(--kind-vnc);
+}
+
+.kind-dot.rdp {
+  background: var(--kind-rdp);
+}
+
+.kind-dot.browser {
+  background: var(--kind-browser);
 }
 
 .sidebar-actions {

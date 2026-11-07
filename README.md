@@ -374,7 +374,8 @@ it, install [rustup](https://rustup.rs) and
   setup line back as a wall of source on your first screen, so the hook prints a
   one-shot random marker and the client swallows everything up to it — see
   `pushData` in [`ssh-terminal.ts`](src/main/ssh/ssh-terminal.ts).
-- **Session manager** — saved sessions grouped into folders in the sidebar.
+- **Session manager** — saved sessions grouped into folders in the sidebar,
+  each with a colour dot for its type and the host (or serial device) it opens.
 
 > An earlier build asked for Touch ID on *every* secret read, which fired on each
 > connection and was unusable. The vault above replaces it: authenticate once, or

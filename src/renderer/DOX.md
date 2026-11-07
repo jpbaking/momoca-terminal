@@ -22,6 +22,7 @@ Owns everything under `src/renderer/`, including `src/components/tools/` and `sr
 
 ## Work Guidance
 - Saved session rows open on double-click only; a single click must not connect (a single-click open was irksome to the maintainer). Enter is the keyboard equivalent. `test/suites/sftpui.mjs` asserts all three.
+- Every session type has a sidebar dot colour of its own: `--kind-<type>` in both theme blocks of `styles.css`, plus a `.kind-dot.<type>` rule. A new `SessionKind` adds all three, and an entry in `SessionTypePicker`'s `TYPES`, which also feeds the row tooltips (`KIND_LABEL`). The row's right edge shows the host (with the port only when it differs from `SessionDialog`'s `DEFAULT_PORT`), the device for Serial, and "local" only for Shell.
 - File lists follow Finder's rules: click selects, ⌘-click toggles, Shift-click takes a range, ⌘A takes everything, double-click opens. Right-clicking inside a selection acts on all of it; outside one, it reselects that row.
 - Every bar or mode that can hide itself keeps a way back (a shortcut and a visible control). A mode with no exit is a trap.
 - MultiExec is off at launch and never persisted.

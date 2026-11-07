@@ -1,5 +1,7 @@
 import type { SavedSession } from '@shared/types'
 import { IconFolderSmall } from './Icons'
+import { DEFAULT_PORT } from './SessionDialog'
+import { KIND_LABEL } from './SessionTypePicker'
 
 interface Props {
   sessions: SavedSession[]
@@ -18,6 +20,28 @@ function groupByFolder(sessions: SavedSession[]): [string, SavedSession[]][] {
     else groups.set(key, [session])
   }
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))
+}
+
+/** Short "where" for the row's right edge: host (and a non-standard port), device, or "local". */
+function sessionTarget(session: SavedSession): string {
+  if (session.kind === 'local') return 'local'
+  if (session.kind === 'serial') return session.serialPath?.replace(/^\/dev\//, '') ?? ''
+  const host = session.host ?? ''
+  const port = session.port
+  return host && port && port !== DEFAULT_PORT[session.kind] ? `${host}:${port}` : host
+}
+
+/** Hover text: the type and the full address it connects to. */
+function sessionTooltip(session: SavedSession): string {
+  const hint = 'double-click to open, right-click to edit'
+  if (session.kind === 'local') return `Local shell${session.shell ? ` (${session.shell})` : ''} — ${hint}`
+  if (session.kind === 'serial') {
+    const baud = session.baudRate ? ` at ${session.baudRate} baud` : ''
+    return `Serial ${session.serialPath ?? ''}${baud} — ${hint}`
+  }
+  const user = session.username ? `${session.username}@` : ''
+  const port = session.port ?? DEFAULT_PORT[session.kind]
+  return `${KIND_LABEL[session.kind]} ${user}${session.host ?? ''}${port ? `:${port}` : ''} — ${hint}`
 }
 
 export function SessionSidebar({ sessions, onOpen, onEdit, onNew }: Props) {
@@ -58,15 +82,11 @@ export function SessionSidebar({ sessions, onOpen, onEdit, onNew }: Props) {
                 e.preventDefault()
                 onEdit(session)
               }}
-              title={
-                session.kind === 'ssh'
-                  ? `${session.username}@${session.host}:${session.port ?? 22} — double-click to open, right-click to edit`
-                  : 'Local shell — double-click to open, right-click to edit'
-              }
+              title={sessionTooltip(session)}
             >
               <span className={`kind-dot ${session.kind}`} />
               <span className="sname">{session.name}</span>
-              <span className="meta">{session.kind === 'ssh' ? session.host : 'local'}</span>
+              <span className="meta">{sessionTarget(session)}</span>
             </button>
           ))}
         </div>
