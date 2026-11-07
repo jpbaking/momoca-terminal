@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { connect as tcpConnect, isIP, type Socket } from 'node:net'
-import { connect as tlsConnect, type PeerCertificate, type TLSSocket } from 'node:tls'
+import { connect as tlsConnect, type PeerCertificate, type SecureVersion, type TLSSocket } from 'node:tls'
 import { WebSocketServer, type RawData, type WebSocket } from 'ws'
 import type { RdpTicket, SavedSession } from '@shared/types'
 import type { ExternalCredentials } from './external-tools'
@@ -44,6 +44,19 @@ const WSA_CODES: Record<string, number> = {
   EAI_AGAIN: 11002
 }
 const WSA_GENERIC = 10060
+
+const wsaCode = (err: unknown): number =>
+  WSA_CODES[(err as NodeJS.ErrnoException).code ?? ''] ?? WSA_GENERIC
+
+/**
+ * BoringSSL, Electron's TLS, refuses a server certificate whose Key Usage
+ * lacks digitalSignature whenever the handshake needs the server to sign:
+ * TLS 1.3, and ECDHE in TLS 1.2. Windows' self-signed RDP certificate allows
+ * only keyEncipherment and dataEncipherment. OpenSSL, and so FreeRDP, does not
+ * check. Retried with TLS capped at 1.2, Windows picks RSA key exchange, which
+ * that certificate allows; servers with a normal certificate keep TLS 1.3.
+ */
+const KEY_USAGE_ERROR = 'ERR_SSL_KEY_USAGE_BIT_INCORRECT'
 
 interface Ticket {
   host: string
@@ -227,7 +240,7 @@ function negotiatedTls(confirm: Buffer): boolean {
   )
 }
 
-function startTls(socket: Socket, host: string): Promise<TLSSocket> {
+function startTls(socket: Socket, host: string, maxVersion?: SecureVersion): Promise<TLSSocket> {
   return new Promise((resolve, reject) => {
     const secure = tlsConnect({
       socket,
@@ -236,6 +249,7 @@ function startTls(socket: Socket, host: string): Promise<TLSSocket> {
       rejectUnauthorized: false,
       // Older Windows servers stop at TLS 1.0.
       minVersion: 'TLSv1',
+      ...(maxVersion ? { maxVersion } : {}),
       servername: isIP(host) ? undefined : host
     })
     secure.once('secureConnect', () => {
@@ -390,31 +404,55 @@ function serve(ws: WebSocket): void {
     if (request.version !== RDCLEANPATH_VERSION || !ticket || !request.x224) {
       return fail(errorPdu({ code: GENERAL_ERROR }))
     }
-    try {
-      server = await connectTcp(ticket.host, ticket.port)
-    } catch (err) {
-      return fail(errorPdu({ wsa: WSA_CODES[(err as NodeJS.ErrnoException).code ?? ''] ?? WSA_GENERIC }))
+    const x224 = request.x224
+
+    /** Connect, relay the X.224 request, upgrade to TLS. Null once it has failed the client. */
+    const handshake = async (maxVersion?: SecureVersion): Promise<Buffer | null> => {
+      try {
+        server = await connectTcp(ticket.host, ticket.port)
+      } catch (err) {
+        fail(errorPdu({ wsa: wsaCode(err) }))
+        return null
+      }
+      if (ws.readyState !== ws.OPEN) {
+        close()
+        return null
+      }
+
+      let confirm: Buffer
+      try {
+        server.write(x224)
+        confirm = await readTpkt(server)
+      } catch (err) {
+        fail(errorPdu({ wsa: wsaCode(err) }))
+        return null
+      }
+      if (!negotiatedTls(confirm)) {
+        fail(errorPdu({ code: NEGOTIATION_ERROR }, confirm))
+        return null
+      }
+
+      try {
+        secure = await startTls(server, ticket.host, maxVersion)
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code === KEY_USAGE_ERROR && !maxVersion && ws.readyState === ws.OPEN) {
+          server.destroy()
+          return handshake('TLSv1.2')
+        }
+        console.warn(`[momoca] RDP TLS to ${ticket.host}:${ticket.port} failed: ${code ?? (err as Error).message}`)
+        // 40: handshake failure, the closest standard alert to "TLS did not work".
+        fail(errorPdu({ tlsAlert: 40 }))
+        return null
+      }
+      return confirm
     }
+
+    const confirm = await handshake()
+    if (!confirm || !secure) return
     if (ws.readyState !== ws.OPEN) return close()
 
-    let confirm: Buffer
-    try {
-      server.write(request.x224)
-      confirm = await readTpkt(server)
-    } catch (err) {
-      return fail(errorPdu({ wsa: WSA_CODES[(err as NodeJS.ErrnoException).code ?? ''] ?? WSA_GENERIC }))
-    }
-    if (!negotiatedTls(confirm)) return fail(errorPdu({ code: NEGOTIATION_ERROR }, confirm))
-
-    try {
-      secure = await startTls(server, ticket.host)
-    } catch {
-      // 40: handshake failure, the closest standard alert to "TLS did not work".
-      return fail(errorPdu({ tlsAlert: 40 }))
-    }
-    if (ws.readyState !== ws.OPEN) return close()
-
-    const address = server.remoteAddress ?? ticket.host
+    const address = server?.remoteAddress ?? ticket.host
     ws.send(responsePdu(address, confirm, certChain(secure)))
     secure.on('data', (chunk: Buffer) => {
       if (ws.readyState === ws.OPEN) ws.send(chunk)

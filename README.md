@@ -147,7 +147,8 @@ copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
   saved with the session (Keychain) or ask for it, and log on with it, so
   servers such as xrdp skip their own login screen.
   - *In a tab* (the default): drawn by IronRDP (WebAssembly) through a
-    loopback-only gateway in the main process, with nothing to install. "Fill
+    loopback-only gateway in the main process, with nothing to install. It
+    connects to Windows hosts using their own self-signed RDP certificate. "Fill
     the tab" makes the remote desktop the tab's size and resizes it with the
     tab; a fixed size scales down to fit. Clipboard text goes both ways. `⌘C`
     `⌘V` `⌘X` `⌘A` `⌘Z` `⌘Y` `⌘S` act as their Ctrl shortcuts, `⌘` tapped alone
