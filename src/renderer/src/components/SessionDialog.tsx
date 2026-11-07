@@ -438,6 +438,16 @@ export function SessionDialog({
                 ? 'Fill the tab, and resize the remote desktop with it'
                 : 'Resize the remote desktop with the window'}
             </label>
+            {inTab && (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={rdp.hiDpi ?? true}
+                  onChange={(e) => setRdp({ hiDpi: e.target.checked })}
+                />
+                Sharp on Retina screens (HiDPI): full resolution, with Windows scaled to match
+              </label>
+            )}
             {!inTab && (
               <>
             <label className="checkbox">
@@ -468,7 +478,7 @@ export function SessionDialog({
             </label>
             <p className="hint">
               {inTab
-                ? 'Sound and the microphone need FreeRDP’s window. In the tab, ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⌘Y and ⌘S act as Ctrl shortcuts, and ⌘ on its own is the Windows key.'
+                ? 'Sound and the microphone need FreeRDP’s window. HiDPI sends four times the pixels; turn it off on a slow link or an old host. In the tab, ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⌘Y and ⌘S act as Ctrl shortcuts, and ⌘ on its own is the Windows key.'
                 : 'Windows App, when it runs the session instead of FreeRDP, uses its own settings.'}
             </p>
           </div>

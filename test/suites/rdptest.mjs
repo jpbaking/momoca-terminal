@@ -80,6 +80,7 @@ for (let i = 0; i < 40 && !existsSync(socketPath); i++) await sleep(100)
 rmSync(userData, { recursive: true, force: true })
 mkdirSync(userData, { recursive: true })
 const FIXTURE = 'rdptest fixture'
+const LOWRES = 'rdptest lowres'
 writeFileSync(join(userData, 'sessions.json'), JSON.stringify({
   version: 1,
   sessions: [{
@@ -91,6 +92,15 @@ writeFileSync(join(userData, 'sessions.json'), JSON.stringify({
     port: relayPort,
     username: 'tester',
     rdp: { engine: 'ironrdp', dynamicResolution: true }
+  }, {
+    id: 'rdptest-lowres',
+    name: LOWRES,
+    kind: 'rdp',
+    folder: '',
+    host: '127.0.0.1',
+    port: relayPort,
+    username: 'tester',
+    rdp: { engine: 'ironrdp', dynamicResolution: true, hiDpi: false }
   }]
 }))
 
@@ -262,6 +272,30 @@ async function main() {
     const forged = await exchange(ticket.proxyAddress, 'not-a-ticket')
     check(isError(forged), 'a made-up ticket is refused')
   } else check(false, 'rdp:open returned a ticket')
+
+  // 7. HiDPI off: the desktop has the tab's size in points, stretched to the screen.
+  const lowRow = await reach('.session-row', LOWRES)
+  if (lowRow) {
+    await click(lowRow, 2)
+    await sleep(800)
+    if (await reach('.scrim .modal input')) { await type('secret'); await submitPrompt() }
+    let low = null
+    for (let i = 0; i < 60; i++) {
+      low = await js(`(() => {
+        const pane = [...document.querySelectorAll('.rdp-pane')].find((p) => !p.hidden)
+        const c = pane?.querySelector('.rdp-canvas')
+        if (!c || c.hidden) return null
+        const r = c.getBoundingClientRect(), s = pane.querySelector('.rdp-screen').getBoundingClientRect()
+        return { width: c.width, height: c.height, cssW: r.width, screenW: s.width, screenH: s.height, ratio: devicePixelRatio }
+      })()`)
+      if (low?.width) break
+      await sleep(250)
+    }
+    const size = low?.width ? `${low.width}x${low.height} in ${Math.round(low.screenW)}x${Math.round(low.screenH)} at ${low.ratio}×` : 'did not connect'
+    check(Boolean(low?.width) && Math.abs(low.width - low.screenW) < 4 && Math.abs(low.height - low.screenH) < 4,
+      `with HiDPI off the desktop is the tab’s size in points (${size})`)
+    if (low?.width && low.ratio > 1) check(Math.abs(low.cssW - low.width) < 1, 'with HiDPI off one canvas pixel is one CSS pixel')
+  } else check(false, 'the HiDPI-off fixture row is reachable in the sidebar')
 
   finish()
 

@@ -119,6 +119,13 @@ export interface RdpOptions {
   height?: number
   /** Resize the remote desktop with its tab or window. In a tab it then fills the tab. */
   dynamicResolution?: boolean
+  /**
+   * IronRDP only: on a HiDPI (Retina) screen, ask for the desktop in device
+   * pixels and have Windows scale to match, so it is sharp. Off, the desktop
+   * has the tab's size in points and is stretched: softer, but a quarter of
+   * the pixels to send and decode. Unset means on.
+   */
+  hiDpi?: boolean
   /** FreeRDP only: play the remote computer's sound on this Mac. */
   playAudio?: boolean
   /** FreeRDP only: pass this Mac's microphone into the session. */

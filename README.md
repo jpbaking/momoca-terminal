@@ -154,7 +154,9 @@ it, install [rustup](https://rustup.rs) and
     the tab" makes the remote desktop the tab's size and resizes it with the
     tab; a fixed size scales down to fit. On a Retina screen the desktop gets
     every screen pixel and Windows scales its UI to match (200%), so text is
-    sharp rather than stretched. Clipboard text goes both ways. `⌘C`
+    sharp rather than stretched; untick "Sharp on Retina screens (HiDPI)" for a
+    softer picture with a quarter of the pixels, for a slow link or an old
+    host. Clipboard text goes both ways. `⌘C`
     `⌘V` `⌘X` `⌘A` `⌘Z` `⌘Y` `⌘S` act as their Ctrl shortcuts, `⌘` tapped alone
     is the Windows key, and every other `⌘` shortcut stays MoMoca's. No sound
     or microphone in a tab.

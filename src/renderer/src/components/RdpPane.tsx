@@ -42,7 +42,7 @@ const RESIZE_SETTLE_MS = 250
  * mstsc does on a HiDPI display, so text is as large as at 1× but sharp
  * instead of stretched. Windows takes 100–500%.
  */
-const pixelRatio = (): number => Math.min(5, Math.max(1, window.devicePixelRatio || 1))
+const devicePixels = (): number => Math.min(5, Math.max(1, window.devicePixelRatio || 1))
 const scalePercent = (ratio: number): number => Math.round(ratio * 100)
 
 /** Calls `onChange` whenever the window moves to a screen with another pixel ratio. */
@@ -104,6 +104,9 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
   const backendRef = useRef<Backend | null>(null)
   const clipboardOn = useRef(true)
   const dynamicRef = useRef(false)
+  /** The session's HiDPI setting; off, every desktop pixel is one CSS pixel. */
+  const hiDpiRef = useRef(true)
+  const pixelRatio = (): number => (hiDpiRef.current ? devicePixels() : 1)
   /** Last text that crossed the clipboard either way, so it isn't echoed back. */
   const lastClip = useRef<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -160,6 +163,7 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
         const options = ticket.options
         clipboardOn.current = options.clipboard !== false
         dynamicRef.current = options.dynamicResolution === true
+        hiDpiRef.current = options.hiDpi !== false
 
         // Dynamic resolution, or no fixed size, starts at the tab's own size.
         const rect = pane.getBoundingClientRect()
@@ -247,17 +251,18 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
     if (!pane || !canvas) return
 
     /*
-     * The canvas holds the desktop in device pixels; it is shown at one canvas
-     * pixel per device pixel, shrunk (keeping its shape) when that would not
-     * fit the tab. IronRDP sets the canvas's width and height on connect and
-     * on every resize.
+     * The canvas holds the desktop in device pixels and is shown at one canvas
+     * pixel per device pixel at most, shrunk when the tab is smaller. Only the
+     * caps are set here: with width and height left auto, CSS shrinks a canvas
+     * to its max-width and max-height keeping its shape, on every layout, so
+     * a tab resize needs no script. IronRDP sets the canvas's width and height
+     * on connect and on every resize.
      */
     const fitCanvas = () => {
       if (!canvas.width || !canvas.height) return
       const ratio = pixelRatio()
-      const fit = Math.min(1, pane.clientWidth / (canvas.width / ratio), pane.clientHeight / (canvas.height / ratio))
-      canvas.style.width = `${(canvas.width / ratio) * fit}px`
-      canvas.style.height = `${(canvas.height / ratio) * fit}px`
+      canvas.style.maxWidth = `min(100%, ${canvas.width / ratio}px)`
+      canvas.style.maxHeight = `min(100%, ${canvas.height / ratio}px)`
     }
 
     // A dynamic desktop follows the tab's size and the screen's pixel ratio.
@@ -281,10 +286,7 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
 
     const sized = new MutationObserver(fitCanvas)
     sized.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] })
-    const observer = new ResizeObserver(() => {
-      fitCanvas()
-      follow()
-    })
+    const observer = new ResizeObserver(follow)
     observer.observe(pane)
     const unwatch = watchPixelRatio(() => {
       fitCanvas()
