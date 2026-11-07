@@ -198,19 +198,81 @@ export interface ExternalCredentials {
 const X_SOCKET = '/tmp/.X11-unix/X0'
 const X_START_TIMEOUT_MS = 15_000
 
+/** How long after a FreeRDP launch to look for the xterm XQuartz opens on start. */
+const STARTUP_CLIENT_WAIT_MS = 15_000
+
+/**
+ * The client XQuartz runs when it is started by hand (`open -a`): its
+ * `app_to_run` preference, an xterm unless the user changed it.
+ */
+async function xquartzStartupClient(): Promise<string> {
+  try {
+    const { stdout } = await run('/usr/bin/defaults', ['read', 'org.xquartz.X11', 'app_to_run'])
+    return stdout.trim()
+  } catch {
+    return '/opt/X11/bin/xterm'
+  }
+}
+
+/** This user's processes whose whole command line is `command`. */
+async function processesRunning(command: string): Promise<number[]> {
+  try {
+    const { stdout } = await run('/bin/ps', ['-x', '-o', 'pid=,args='])
+    return stdout
+      .split('\n')
+      .map((line) => line.trim().match(/^(\d+)\s+(.*)$/))
+      .filter((m): m is RegExpMatchArray => m !== null && m[2] === command)
+      .map((m) => Number(m[1]))
+  } catch {
+    return []
+  }
+}
+
+/** XQuartz as started for a handoff, and the start-up clients already running before it. */
+interface XStart {
+  client: string
+  before: Set<number>
+}
+
 /**
  * FreeRDP's X11 client needs a display, and an app started from Finder has no
  * `$DISPLAY`. Start XQuartz if it isn't running and wait for :0 to appear.
+ * Returns what `closeStartupClient` needs when this call started XQuartz.
  */
-async function ensureXDisplay(): Promise<string | null> {
-  if (existsSync(X_SOCKET)) return ':0'
+async function ensureXDisplay(): Promise<{ display: string; started: XStart | null } | null> {
+  if (existsSync(X_SOCKET)) return { display: ':0', started: null }
   if (!(await checkTool('xquartz'))?.available) return null
+  const client = await xquartzStartupClient()
+  const before = new Set(client ? await processesRunning(client) : [])
   spawn('/usr/bin/open', ['-a', 'XQuartz'], { detached: true, stdio: 'ignore' }).unref()
   for (let waited = 0; waited < X_START_TIMEOUT_MS; waited += 250) {
     await new Promise((resolve) => setTimeout(resolve, 250))
-    if (existsSync(X_SOCKET)) return ':0'
+    if (existsSync(X_SOCKET)) return { display: ':0', started: { client, before } }
   }
   return null
+}
+
+/**
+ * Close the xterm XQuartz opened when a handoff started it: the session has its
+ * own window, and nobody asked for a terminal. Only a start-up client that
+ * appeared after that start is closed, so xterms the user opened stay.
+ */
+async function closeStartupClient({ client, before }: XStart): Promise<void> {
+  if (!client) return
+  for (let waited = 0; waited < STARTUP_CLIENT_WAIT_MS; waited += 500) {
+    const fresh = (await processesRunning(client)).filter((pid) => !before.has(pid))
+    if (fresh.length) {
+      for (const pid of fresh) {
+        try {
+          process.kill(pid, 'SIGTERM')
+        } catch {
+          // Already gone.
+        }
+      }
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500))
+  }
 }
 
 /** The X11 builds are named xfreerdp; the SDL build draws its own native window. */
@@ -269,13 +331,15 @@ async function launchFreeRdp(
   const host = session.host ?? ''
   const port = session.port ?? 3389
   const env = { ...process.env }
+  let xStart: XStart | null = null
 
   if (needsXServer(binary)) {
-    const display = await ensureXDisplay()
-    if (!display) {
+    const x = await ensureXDisplay()
+    if (!x) {
       return { launched: false, message: 'FreeRDP needs XQuartz, which did not start', tool: 'xquartz' }
     }
-    env.DISPLAY = display
+    env.DISPLAY = x.display
+    xStart = x.started
   }
 
   const label = session.username ? `${session.username}@${host}` : host
@@ -283,9 +347,11 @@ async function launchFreeRdp(
   const password = stored ?? (await credentials.askPassword(label, `RDP password for ${label}:`))
   // Without a password FreeRDP asks for one on a terminal that a handoff does
   // not have, and waits there for ever.
-  if (!password) return { launched: false, message: 'RDP connection cancelled — no password given' }
-  if (/[\r\n]/.test(password)) {
-    return { launched: false, message: 'FreeRDP cannot take a password containing a line break' }
+  if (!password || /[\r\n]/.test(password)) {
+    if (xStart) void closeStartupClient(xStart)
+    return password
+      ? { launched: false, message: 'FreeRDP cannot take a password containing a line break' }
+      : { launched: false, message: 'RDP connection cancelled — no password given' }
   }
 
   const args = [`/v:${host}:${port}`, '/cert:ignore', ...rdpOptionArgs(session.rdp)]
@@ -320,6 +386,8 @@ async function launchFreeRdp(
     })
   })
 
+  // Past connecting, or failed: either way XQuartz's xterm has no use now.
+  if (xStart) void closeStartupClient(xStart)
   if (exit === 'running') return { launched: true, message: `Started FreeRDP against ${host}` }
   if (exit === 0) return { launched: true, message: `FreeRDP session to ${host} ended` }
   const reason = lastFreeRdpError(logPath, from) ?? `exit code ${exit}`

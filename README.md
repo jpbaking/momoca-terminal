@@ -163,7 +163,8 @@ it, install [rustup](https://rustup.rs) and
   - *In its own window*: hands the session to FreeRDP (or Windows App), which
     adds sound on this Mac, microphone passthrough and full screen. FreeRDP
     gets the password on stdin rather than the command line, starts XQuartz
-    for the X11 client, and shows FreeRDP's error if it can't connect.
+    for the X11 client (closing the xterm XQuartz opens on start, so only the
+    session's window stays), and shows FreeRDP's error if it can't connect.
 - **Tabbed terminals** — local login shells and SSH, WebGL-rendered, 20k lines of
   scrollback. `⌘T` new tab, `⌘W` close, `⌘1`–`⌘9` switch, middle-click to close.
   When a session ends (the shell exits, the SSH connection drops, or it fails
