@@ -105,8 +105,10 @@ again after you install a new one.
 
 RDP tabs use IronRDP's web client from `vendor/iron-remote-desktop-rdp`, built
 from a pinned IronRDP commit because npm's 0.7.0 lacks fixes they need (xrdp's
-screen updates drew sheared without them). A normal build uses the committed
-copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
+screen updates drew sheared without them), plus MoMoca's patches from
+`scripts/ironrdp-patches/` (a desktop scale factor at logon, for Retina
+screens). A normal build uses the committed copy and needs no Rust. To update
+it, install [rustup](https://rustup.rs) and
 `cargo install wasm-pack --version 0.15.0 --locked`, change the commit in
 `scripts/build-ironrdp.sh`, and run it.
 
@@ -150,7 +152,9 @@ copy and needs no Rust. To update it, install [rustup](https://rustup.rs) and
     loopback-only gateway in the main process, with nothing to install. It
     connects to Windows hosts using their own self-signed RDP certificate. "Fill
     the tab" makes the remote desktop the tab's size and resizes it with the
-    tab; a fixed size scales down to fit. Clipboard text goes both ways. `⌘C`
+    tab; a fixed size scales down to fit. On a Retina screen the desktop gets
+    every screen pixel and Windows scales its UI to match (200%), so text is
+    sharp rather than stretched. Clipboard text goes both ways. `⌘C`
     `⌘V` `⌘X` `⌘A` `⌘Z` `⌘Y` `⌘S` act as their Ctrl shortcuts, `⌘` tapped alone
     is the Windows key, and every other `⌘` shortcut stays MoMoca's. No sound
     or microphone in a tab.

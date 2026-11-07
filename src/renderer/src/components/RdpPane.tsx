@@ -36,6 +36,31 @@ function loadBackend(): Promise<Backend> {
 const desktopSide = (n: number): number => Math.min(8192, Math.max(200, Math.floor(n / 4) * 4))
 const RESIZE_SETTLE_MS = 250
 
+/**
+ * Device pixels per CSS pixel: 2 on a Retina screen. The desktop is asked for
+ * in device pixels and Windows is told to scale by the same amount (200%), as
+ * mstsc does on a HiDPI display, so text is as large as at 1× but sharp
+ * instead of stretched. Windows takes 100–500%.
+ */
+const pixelRatio = (): number => Math.min(5, Math.max(1, window.devicePixelRatio || 1))
+const scalePercent = (ratio: number): number => Math.round(ratio * 100)
+
+/** Calls `onChange` whenever the window moves to a screen with another pixel ratio. */
+function watchPixelRatio(onChange: () => void): () => void {
+  let query: MediaQueryList | null = null
+  const listen = () => {
+    query?.removeEventListener('change', changed)
+    query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    query.addEventListener('change', changed)
+  }
+  const changed = () => {
+    listen()
+    onChange()
+  }
+  listen()
+  return () => query?.removeEventListener('change', changed)
+}
+
 /** IronErrorKind, as numbered by @devolutions/iron-remote-desktop. */
 const ERROR_TEXT: Record<number, string> = {
   1: 'Wrong user name or password',
@@ -139,8 +164,9 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
         // Dynamic resolution, or no fixed size, starts at the tab's own size.
         const rect = pane.getBoundingClientRect()
         const fixed = !dynamicRef.current && options.width && options.height
-        const width = desktopSide(fixed ? options.width! : rect.width || 1024)
-        const height = desktopSide(fixed ? options.height! : rect.height || 768)
+        const ratio = pixelRatio()
+        const width = desktopSide((fixed ? options.width! : rect.width || 1024) * ratio)
+        const height = desktopSide((fixed ? options.height! : rect.height || 768) * ratio)
 
         const builder = new mod.Backend.SessionBuilder()
         builder.username(ticket.username)
@@ -158,6 +184,7 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
           } else canvas.style.cursor = kind === 'hidden' || kind === 'none' ? 'none' : 'default'
         })
         builder.extension(mod.displayControl(dynamicRef.current))
+        if (ratio > 1) builder.extension(mod.desktopScaleFactor(scalePercent(ratio)))
         if (clipboardOn.current) {
           builder.remoteClipboardChangedCallback((data: RemoteClipboard) => {
             const item = data.items().find((i) => i.mimeType() === 'text/plain')
@@ -216,24 +243,58 @@ export function RdpPane({ tab, slot, focused, split, target, onFocus, onStatus }
 
   useEffect(() => {
     const pane = paneRef.current
-    if (!pane) return
+    const canvas = canvasRef.current
+    if (!pane || !canvas) return
+
+    /*
+     * The canvas holds the desktop in device pixels; it is shown at one canvas
+     * pixel per device pixel, shrunk (keeping its shape) when that would not
+     * fit the tab. IronRDP sets the canvas's width and height on connect and
+     * on every resize.
+     */
+    const fitCanvas = () => {
+      if (!canvas.width || !canvas.height) return
+      const ratio = pixelRatio()
+      const fit = Math.min(1, pane.clientWidth / (canvas.width / ratio), pane.clientHeight / (canvas.height / ratio))
+      canvas.style.width = `${(canvas.width / ratio) * fit}px`
+      canvas.style.height = `${(canvas.height / ratio) * fit}px`
+    }
+
+    // A dynamic desktop follows the tab's size and the screen's pixel ratio.
     let timer: ReturnType<typeof setTimeout> | undefined
     let last = ''
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect
+    const follow = () => {
+      const width = pane.clientWidth
+      const height = pane.clientHeight
       if (!dynamicRef.current || width < 50 || height < 50) return // hidden, or not dynamic
       clearTimeout(timer)
       timer = setTimeout(() => {
-        const key = `${desktopSide(width)}x${desktopSide(height)}`
+        const ratio = pixelRatio()
+        const w = desktopSide(width * ratio)
+        const h = desktopSide(height * ratio)
+        const key = `${w}x${h}@${ratio}`
         if (key === last || !sessionRef.current) return
         last = key
-        sessionRef.current.resize(desktopSide(width), desktopSide(height))
+        sessionRef.current.resize(w, h, scalePercent(ratio))
       }, RESIZE_SETTLE_MS)
+    }
+
+    const sized = new MutationObserver(fitCanvas)
+    sized.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] })
+    const observer = new ResizeObserver(() => {
+      fitCanvas()
+      follow()
     })
     observer.observe(pane)
+    const unwatch = watchPixelRatio(() => {
+      fitCanvas()
+      follow()
+    })
     return () => {
       clearTimeout(timer)
+      sized.disconnect()
       observer.disconnect()
+      unwatch()
     }
   }, [])
 

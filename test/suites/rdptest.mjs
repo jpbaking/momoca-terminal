@@ -151,7 +151,7 @@ async function main() {
   }
   check((await tabs()).some((t) => t.includes(FIXTURE)), 'the session opened as a tab, not a window')
 
-  // 2. The canvas connects and fills the tab.
+  // 2. The canvas connects and fills the tab, in device pixels (2× on Retina).
   let state = null
   for (let i = 0; i < 60; i++) {
     state = await js(`(() => {
@@ -160,15 +160,18 @@ async function main() {
       if (!c || c.hidden) return { status: document.querySelector('.rdp-status')?.innerText ?? '' }
       const r = c.getBoundingClientRect(), s = screen.getBoundingClientRect()
       return { width: c.width, height: c.height, cssW: r.width, cssH: r.height, screenW: s.width, screenH: s.height,
-        left: r.left, top: r.top }
+        left: r.left, top: r.top, ratio: devicePixelRatio }
     })()`)
     if (state?.width) break
     await sleep(250)
   }
   check(Boolean(state?.width), `IronRDP connected through the gateway${state?.width ? '' : ` (${state?.status})`}`)
   if (!state?.width) return finish()
-  const fills = (s) => Math.abs(s.width - s.screenW) < 4 && Math.abs(s.height - s.screenH) < 4
-  check(fills(state), `the desktop fills the tab (${state.width}x${state.height} in ${Math.round(state.screenW)}x${Math.round(state.screenH)})`)
+  const fills = (s) => Math.abs(s.width - s.screenW * s.ratio) < 4 * s.ratio && Math.abs(s.height - s.screenH * s.ratio) < 4 * s.ratio
+  check(fills(state), `the desktop fills the tab (${state.width}x${state.height} in ${Math.round(state.screenW)}x${Math.round(state.screenH)} at ${state.ratio}×)`)
+  // One canvas pixel per screen pixel: nothing is stretched, so nothing blurs.
+  const sharp = Math.abs(state.cssW * state.ratio - state.width) < 1 && Math.abs(state.cssH * state.ratio - state.height) < 1
+  check(sharp, `the canvas is drawn 1:1 with screen pixels (${Math.round(state.cssW)}x${Math.round(state.cssH)} CSS px for ${state.width}x${state.height})`)
 
   // 3. The server's picture reached the canvas: more than one colour on screen.
   await sleep(1500)
@@ -199,7 +202,7 @@ async function main() {
   win.setSize(1000, 700); await sleep(2500)
   const resized = await js(`(() => {
     const c = document.querySelector('.rdp-canvas'), s = document.querySelector('.rdp-screen').getBoundingClientRect()
-    return { width: c.width, height: c.height, screenW: s.width, screenH: s.height }
+    return { width: c.width, height: c.height, screenW: s.width, screenH: s.height, ratio: devicePixelRatio }
   })()`)
   // FreeRDP's sample server has no Display Control channel, so it keeps its
   // size; a Windows host resizes. Either way the desktop must stay in the tab.

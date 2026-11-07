@@ -7,6 +7,12 @@
 # them, this builds a pinned commit the way IronRDP's `cargo xtask web build`
 # does. Bump IRONRDP_COMMIT, run this, run test/suites/rdptest.mjs, commit.
 #
+# Local patches in scripts/ironrdp-patches/*.patch apply on top, in order:
+#   0001-desktop-scale-factor  `desktopScaleFactor(percent)` extension, so a
+#                              Retina tab logs in at 200% instead of 100%.
+# Make a new one with `git diff` in the checkout. Drop a patch once the
+# pinned commit carries the change; a patch that no longer applies fails here.
+#
 # Needs: git, npm, and rustup (https://rustup.rs) with wasm-pack:
 #   cargo install wasm-pack --version 0.15.0 --locked
 # The Rust toolchain itself comes from IronRDP's rust-toolchain.toml.
@@ -34,7 +40,13 @@ git fetch --quiet origin "$IRONRDP_COMMIT" 2>/dev/null || git fetch --quiet orig
 git checkout --quiet --force "$IRONRDP_COMMIT"
 COMMIT="$(git rev-parse HEAD)"
 SHORT="$(git rev-parse --short=7 HEAD)"
-echo "Building IronRDP $COMMIT"
+PATCHED=""
+for patch in "$ROOT"/scripts/ironrdp-patches/*.patch; do
+  [ -e "$patch" ] || continue
+  git apply "$patch"
+  PATCHED="$PATCHED $(basename "$patch" .patch)"
+done
+echo "Building IronRDP $COMMIT${PATCHED:+ with${PATCHED}}"
 
 # The pinned toolchain from rust-toolchain.toml, with the WebAssembly target.
 TOOLCHAIN="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)"
@@ -72,13 +84,13 @@ cp "$DIST/iron-remote-desktop-rdp.js" "$DIST/index.d.ts" "$VENDOR/"
 cp LICENSE-MIT LICENSE-APACHE "$VENDOR/"
 node -e '
   const fs = require("fs");
-  const [dist, vendor, commit, short] = process.argv.slice(1);
+  const [dist, vendor, commit, short, patched] = process.argv.slice(1);
   const pkg = JSON.parse(fs.readFileSync(dist + "/package.json", "utf8"));
-  pkg.version = pkg.version + "-git." + short;
+  pkg.version = pkg.version + "-git." + short + (patched ? ".patched" : "");
   pkg.gitHead = commit;
   pkg.files = [...pkg.files, "LICENSE-MIT", "LICENSE-APACHE"];
   fs.writeFileSync(vendor + "/package.json", JSON.stringify(pkg, null, 2) + "\n");
-' "$DIST" "$VENDOR" "$COMMIT" "$SHORT"
+' "$DIST" "$VENDOR" "$COMMIT" "$SHORT" "$PATCHED"
 
 echo "Vendored IronRDP $SHORT into vendor/iron-remote-desktop-rdp"
 echo "Next: npm install, npm run build, then test/suites/rdptest.mjs"

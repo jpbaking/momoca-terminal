@@ -42,6 +42,9 @@ declare class ClipboardItem_2 {
     value(): any;
 }
 
+/** Desktop scale factor in percent (100–500) announced at connection time, as on a HiDPI display. */
+export declare function desktopScaleFactor(percent: number): Extension;
+
 declare class DesktopSize {
     free(): void;
     [Symbol.dispose](): void;
