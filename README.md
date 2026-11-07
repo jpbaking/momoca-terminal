@@ -96,8 +96,12 @@ but never built the native modules. Do not try to fix the first one by pinning
 node-gyp forward: `@electron/rebuild` pins `node-gyp@^9` and drives its
 programmatic API, and a newer major makes its worker hang with no output at all.
 
-Signing is optional. Without a Developer ID the DMG still builds and runs; it is
-simply unsigned, and users need the right-click-Open dance above.
+Signing is optional. Without a Developer ID, `scripts/adhoc-sign.js` ad-hoc
+signs the app so macOS can grant it Local Network access (without that, every
+connection to a host on your own subnet fails with "No route to host"). It is
+still not notarized, so users need the right-click-Open dance above. Ad-hoc
+signatures change with each build, so macOS may ask for Local Network access
+again after you install a new one.
 
 RDP tabs use IronRDP's web client from `vendor/iron-remote-desktop-rdp`, built
 from a pinned IronRDP commit because npm's 0.7.0 lacks fixes they need (xrdp's

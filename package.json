@@ -44,6 +44,7 @@
   "build": {
     "appId": "dev.local.momoca",
     "productName": "MoMoca",
+    "afterPack": "scripts/adhoc-sign.js",
     "directories": {
       "output": "release"
     },
@@ -63,7 +64,8 @@
         }
       ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "MoMoca passes your microphone to remote desktop sessions you turn it on for."
+        "NSMicrophoneUsageDescription": "MoMoca passes your microphone to remote desktop sessions you turn it on for.",
+        "NSLocalNetworkUsageDescription": "MoMoca connects to SSH, RDP, VNC and other hosts on your local network, and its network tools ping and scan them."
       },
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
